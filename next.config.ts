@@ -25,6 +25,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Development previews are served from a proxied host; production builds are
+  // unaffected by this list.
+  allowedDevOrigins: ["*.e2b.app"],
   async headers() {
     return [
       {

@@ -9,6 +9,10 @@ dist/
 next-env.d.ts
 *.tsbuildinfo
 
+# Test and preview databases (embedded PostgreSQL)
+.pgdata-test/
+.pgdata-dev/
+
 # Tests / coverage
 coverage/
 .vitest/

@@ -2,26 +2,26 @@
 
 > **نظام تشغيل ذكي للتجارة الإلكترونية** لمتاجر Salla. يفهم المتجر، يحلّل أداءه، يكتشف الفرص والمشكلات، يقترح الإجراءات، ثم ينفّذها بعد موافقة صريحة ويقيس أثرها.
 
-**الحالة الحالية:** `Phase 01 — Foundation & Architecture` مكتملة تقنيًا وبانتظار المراجعة.  
-**لا يوجد اتصال بـ Salla، ولا بيانات متجر، ولا مزوّد ذكاء اصطناعي مربوط، ولا تنفيذ أي إجراءات.**
+**الحالة الحالية:** `Phase 02 — Authentication & Multi-Tenancy` منفّذة تقنيًا وبانتظار مراجعة المالك.  
+**لا يوجد اتصال بـ Salla، ولا بيانات متجر، ولا تحليلات، ولا مزوّد ذكاء اصطناعي مربوط، ولا كتابة على أي متجر.**
 
 ---
 
-## ما تم في هذه المرحلة
+## ما تم في Phase 02
 
-- فحص المستودع (كان فارغًا) وتوثيق الحالة الحقيقية.
-- معمارية كاملة: بيانات، أمان، تعدد مستأجرين، أحداث، AI، تكامل Salla، نشر واختبارات.
-- تعريف المنتج وخارطة طريق من 25 مرحلة + مراجعة نهائية.
-- سجل قرارات معمارية (ADRs) مع الأسباب والبدائل.
-- أساس تقني بحد أدنى: Next.js 16 + TypeScript strict + Tailwind 4.
-- طبقة إعدادات/أخطاء/سجلات مُتحقَّق منها.
-- عقد طبقة AI مستقل عن المزوّد + بوابة توليد مع تحقق مخرجات وإعادة محاولة — **بلا أي مزوّد**.
-- واجهة تأسيسية عربية RTL تعرض الحالة الفعلية فقط.
-- اختبارات وحدة، بوابة فحص أسرار، وCI.
+- **PostgreSQL + Drizzle**: سبعة جداول (`users`, `organizations`, `organization_members`, `invitations`, `stores`, `sessions`, `audit_logs`) وهجرتان: بنية + سياسات RLS.
+- **مصادقة**: تسجيل/دخول/خروج بجلسات مخزّنة في قاعدة البيانات، كلمات مرور `scrypt`، رموز عشوائية يُخزَّن HMAC-SHA256 منها فقط، وكوكي `__Host-ksh_session` (`HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`).
+- **تعدد مستأجرين**: `TenantContext` مشتق من الجلسة فقط (Session → Organization → Membership → Role)، وRLS بـ `FORCE` على أربعة جداول، واختبارات عزل حقيقية.
+- **RBAC**: خمسة أدوار (Owner/Admin/Manager/Analyst/Viewer) وخمسة عشر صلاحية، مع منع تصعيد الصلاحيات وإزالة آخر مالك.
+- **دعوات**: رموز لمرة واحدة تنتهي بعد 7 أيام، مربوطة ببريد المدعو.
+- **حماية الطلبات**: CSRF (Origin/Referer + double-submit token)، حدّ معدّل للدخول/التسجيل/الدعوات، وأخطاء موحّدة 401/403/404/409/422/429.
+- **تدقيق**: أحداث `user.*`, `organization.*`, `member.*`, `store.created`, `session.revoked` بلا كلمات مرور أو رموز أو PII غير لازمة.
+- **واجهة عربية RTL**: دخول، تسجيل، تهيئة، مساحة مؤسسة، أعضاء، متاجر، وقبول دعوة — بحالة صريحة `Salla: Not Connected`.
+- **اختبارات**: 64 اختبار وحدة + 32 اختبار تكامل/أمن على PostgreSQL حقيقي.
 
 ## ما لم يُبنَ (مقصود)
 
-قاعدة البيانات، المصادقة، Salla OAuth، المزامنة، Webhooks، التحليلات، SEO، التسويق، الوكيل الذكي، Dashboard، وأي كتابة على متجر. تبدأ في المراحل 02+ وفق [`docs/roadmap.md`](docs/roadmap.md).
+Salla OAuth أو أي اتصال متجر، مزامنة بيانات، Webhooks، منتجات/طلبات/عملاء/مخزون، SEO، تسويق، وكيل ذكاء اصطناعي، تحليلات، Dashboard، أو أي كتابة على متجر. تبدأ في المراحل 03+ وفق [`docs/roadmap.md`](docs/roadmap.md).
 
 ---
 
@@ -31,98 +31,78 @@
 # Node.js 22 مطلوب (.nvmrc)
 npm install
 cp .env.example .env.local
+
+# في .env.local: عيّن DATABASE_URL و AUTH_SECRET (32 حرفًا على الأقل)
+# مثال محلي (PostgreSQL 16 أو أحدث):
+#   DATABASE_URL=postgresql://user:password@localhost:5432/kshakha_dev
+#   AUTH_SECRET=<openssl rand -base64 32>
+
+npm run db:migrate   # يطبّق drizzle/0000_init.sql ثم 0001_rls.sql
 npm run dev
 ```
 
 - الواجهة: <http://localhost:3000>
 - الصحة: <http://localhost:3000/api/health>
+- بدون `DATABASE_URL` تعمل الصفحة التعريفية و`/api/health` (بحالة `not_configured`)، لكن التسجيل والدخول يحتاجان قاعدة بيانات.
 
-> لا تحتاج أي مفاتيح في Phase 01. المتغيّرات السرية معلّقة في `.env.example` حتى مراحلها.  
-> **لا تضع قيمًا حقيقية في `.env.example` أو Git.**
+> لا تُضاف أي أسرار إلى المستودع. `.env.example` يسرد **أسماء** المتغيّرات فقط.
 
----
+## الاختبارات
 
-## الأوامر
-
-| الأمر | الوظيفة |
+| الأمر | ماذا يفعل |
 |---|---|
-| `npm run dev` | تشغيل التطوير |
-| `npm run build` | بناء إنتاجي |
-| `npm start` | تشغيل البناء |
-| `npm run lint` | ESLint (flat config) |
-| `npm run typecheck` | TypeScript بلا إصدار |
-| `npm test` | اختبارات Vitest |
-| `npm run check:secrets` | فحص الأسرار في الملفات المتعقّبة |
-| `npm run format` / `format:check` | Prettier |
-| `npm run verify` | lint → typecheck → tests → secrets → build |
+| `npm test` | 64 اختبار وحدة (كلمات مرور، رموز، صلاحيات، تحقق من المدخلات، حدود المعدّل) |
+| `npm run test:integration` | 32 اختبار تكامل/أمن على **PostgreSQL حقيقي** (تشغيل تلقائي عبر `embedded-postgres` محليًا) |
+| `npm run verify` | تنسيق + lint + أنواع + كل الاختبارات + فحص الأسرار + بناء إنتاجي |
 
----
+`test:integration` يشغّل PostgreSQL 18 محليًا على المنفذ `55432` في `.pgdata-test/` (مُستثنى من Git)، وينشئ دورًا غير مالك `ksh_app` حتى تُفرض سياسات RLS فعليًا. في CI يُستخدم خدمة `postgres:16` عبر `TEST_DATABASE_URL`.
 
-## التقنيات
+## الأمان (ملخّص)
 
-| الطبقة | الاختيار |
-|---|---|
-| Framework | Next.js 16 (App Router) / React 19 |
-| Language | TypeScript 5.9 (strict) |
-| Styling | Tailwind CSS 4 (CSS-first tokens) |
-| Validation | Zod 4 |
-| Logging | pino (JSON + redaction) |
-| Testing | Vitest 5 |
-| Lint/Format | ESLint 9 + Prettier 3 |
-| CI | GitHub Actions |
-| Database / ORM | PostgreSQL + Drizzle — **Phase 02** |
-| Auth | جلسات opaque مخصّصة — **Phase 02** |
+- `scrypt` بمعاملات `N=16384, r=8, p=1, keylen=64`, salt عشوائي 16 بايت، ومقارنة `timingSafeEqual`.
+- جلسة خمول 7 أيام وحد أقصى 30 يومًا، تحديث `last_seen_at` مخفّف، وإبطال فوري.
+- كل كتابة تمرّ بفحص صلاحية داخل use case، وليس في الواجهة فقط.
+- معرّف المتجر القادم من العميل يُعامل كطلب لا كدليل؛ المتجر العائد لمؤسسة أخرى = **404**.
+- سجل التدقيق append-only (لا سياسات UPDATE/DELETE). السجلات لا تحتوي كلمات مرور أو رموزًا.
+- السجلات تسجّل رموز أخطاء فقط عند 5xx، لا رسائل قاعدة البيانات التي قد تحوي قيمًا.
 
-**ملاحظة:** TypeScript 5.9 مثبّت لأن `typescript-eslint` الحالي لا يدعم 7.x. التفاصيل في ADR-003.
-
----
-
-## هيكل المستودع
+## بنية المستودع
 
 ```text
 src/
-  app/                 # مسارات Next.js + /api/health
-  components/          # مكوّنات عرض RTL
-  config/              # بيانات المنتج والوحدات (آمنة للعميل)
-  lib/
-    ai/                # عقد المزوّد + السجل + البوابة (بلا مزوّد)
-    env.ts             # تحقق البيئة
-    errors.ts          # تصنيف الأخطاء
-    logger.ts          # سجلات منظمة مع تنقية
-  test/stubs/          # بديل server-only للاختبارات
-docs/
-  architecture.md      # المعمارية الكاملة (A–Q)
-  product-spec.md      # تعريف المنتج
-  roadmap.md           # 25 مرحلة + بوابات
-  decisions.md         # ADRs
-  salla-reference.md   # حقائق Salla الموثّقة فقط
-  phase-02.md          # خطة المرحلة التالية
-scripts/check-secrets.mjs
+├── app/                 # صفحات عربية RTL + 13 Route Handler
+├── components/          # واجهة (auth, app, brand, status)
+├── db/                  # schema, client, tenant transaction, migrations
+├── modules/
+│   ├── identity/        # scrypt, tokens, permissions, auth-service
+│   ├── organizations/   # memberships, invitations
+│   ├── stores/          # internal store records
+│   └── audit/           # append-only audit log
+├── server/              # CSRF, rate limit, session, API envelope
+└── test/                # embedded PostgreSQL harness + integration tests
+drizzle/                 # 0000_init.sql, 0001_rls.sql (مراجَعة يدويًا)
+docs/                    # architecture, product-spec, roadmap, decisions, salla-reference, phase-02
 ```
-
----
 
 ## الوثائق
 
-- [المعمارية](docs/architecture.md) — الحالة، الأخطاء، القرارات، البيانات، الأمان، AI، الأحداث، الحوكمة.
-- [تعريف المنتج](docs/product-spec.md) — المشكلة، المستخدم، الوحدات، المقاييس، الحدود القانونية.
-- [خارطة الطريق](docs/roadmap.md) — 25 مرحلة بمعايير خروج.
-- [القرارات](docs/decisions.md) — 28 ADR.
-- [مرجع Salla](docs/salla-reference.md) — كل Endpoint/Scope مع مصدره وتاريخ التحقق.
-- [Phase 02](docs/phase-02.md) — النطاق، المخطط، الأمن، الاختبارات، معايير الخروج.
+- [`docs/architecture.md`](docs/architecture.md) — المعمارية الكاملة (مصدر الحقيقة).
+- [`docs/product-spec.md`](docs/product-spec.md) — تعريف المنتج.
+- [`docs/roadmap.md`](docs/roadmap.md) — 25 مرحلة وبوابات G1–G5.
+- [`docs/decisions.md`](docs/decisions.md) — 33 قرارًا معماريًا بالسبب والبدائل.
+- [`docs/salla-reference.md`](docs/salla-reference.md) — حقائق Salla الموثّقة فقط.
+- [`docs/phase-02.md`](docs/phase-02.md) — خطة Phase 02 وملاحظات التنفيذ.
 
----
+## السكربتات
 
-## مبادئ غير قابلة للتفاوض
-
-1. **AI لا ينفّذ مباشرة.** توصية → تحقق → موافقة → تنفيذ → قياس.
-2. **عزل المستأجرين.** لا `store_id` من العميل كدليل صلاحية.
-3. **لا Endpoint مخترع.** كل تكامل Salla موثّق ومُسجَّل.
-4. **لا بيانات وهمية.** الأرقام إما حقيقية أو «غير متاحة».
-5. **لا أسرار في Git.** `.env.example` فقط، وفحص آلي في CI.
-
----
-
-## المساهمة والمراحل
-
-المشروع يُبنى مرحلة بمرحلة. **Phase 01 متوقفة بانتظار المراجعة**؛ لا يبدأ OAuth أو المزامنة أو AI قبل اعتمادها. أي تغيير معماري يتطلب تحديث ADR.
+| السكربت | الوصف |
+|---|---|
+| `dev` / `build` / `start` | Next.js 16 |
+| `lint` / `lint:fix` | ESLint 9 |
+| `typecheck` | TypeScript strict |
+| `format` / `format:check` | Prettier |
+| `test` / `test:watch` | Vitest (وحدة) |
+| `test:integration` | Vitest + PostgreSQL حقيقي |
+| `check:secrets` | فحص الملفات المتعقّبة |
+| `db:generate` / `db:migrate` / `db:studio` | Drizzle |
+| `verify` | البوابة الكاملة قبل الاعتماد |

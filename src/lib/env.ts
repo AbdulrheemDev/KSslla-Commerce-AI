@@ -27,6 +27,7 @@ export const serverEnvSchema = z.object({
 
   // Phase 02 — persistence and sessions
   DATABASE_URL: optionalText,
+  MIGRATION_DATABASE_URL: optionalText,
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET must be at least 32 characters.").optional(),
   ENCRYPTION_KEY: z
     .string()

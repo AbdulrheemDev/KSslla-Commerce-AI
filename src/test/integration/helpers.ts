@@ -1,0 +1,239 @@
+import { NextRequest } from "next/server";
+import type { NextResponse } from "next/server";
+
+import { resetRateLimits } from "@/server/rate-limit";
+import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "@/modules/identity/domain/session-policy";
+import { resetDatabase } from "@/test/db/client";
+
+export const BASE_URL = "http://localhost:3000";
+
+export function resetState(): Promise<void> {
+  resetRateLimits();
+  return resetDatabase();
+}
+
+export interface JsonEnvelope<T> {
+  data?: T;
+  error?: { code: string; message: string };
+}
+
+/** Minimal cookie-aware HTTP client for direct route-handler invocation. */
+export class ApiClient {
+  readonly cookies = new Map<string, string>();
+
+  private cookieHeader(): string | undefined {
+    if (this.cookies.size === 0) return undefined;
+    return [...this.cookies.entries()].map(([name, value]) => `${name}=${value}`).join("; ");
+  }
+
+  private capture(response: NextResponse): void {
+    for (const cookie of response.cookies.getAll()) {
+      if (cookie.value === "") {
+        this.cookies.delete(cookie.name);
+      } else {
+        this.cookies.set(cookie.name, cookie.value);
+      }
+    }
+  }
+
+  private build(
+    path: string,
+    init: {
+      method: string;
+      body?: unknown;
+      headers?: Record<string, string>;
+    },
+  ): NextRequest {
+    const headers = new Headers({
+      host: "localhost:3000",
+      origin: BASE_URL,
+      ...(init.headers ?? {}),
+    });
+
+    const cookie = this.cookieHeader();
+    if (cookie) headers.set("cookie", cookie);
+    if (init.body !== undefined) headers.set("content-type", "application/json");
+
+    return new NextRequest(`${BASE_URL}${path}`, {
+      method: init.method,
+      headers,
+      ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+    });
+  }
+
+  async ensureCsrf(): Promise<string> {
+    const { GET } = await import("@/app/api/auth/csrf/route");
+    const response = await GET();
+    this.capture(response);
+    const payload = (await response.json()) as JsonEnvelope<{ csrfToken: string }>;
+    return payload.data?.csrfToken ?? "";
+  }
+
+  async request<T>(
+    method: "GET" | "POST" | "PATCH" | "DELETE",
+    path: string,
+    options: {
+      body?: unknown;
+      headers?: Record<string, string>;
+      params?: Record<string, string>;
+    } = {},
+  ): Promise<{ status: number; body: JsonEnvelope<T>; response: NextResponse }> {
+    const headers: Record<string, string> = { ...(options.headers ?? {}) };
+
+    if (method !== "GET") {
+      const csrf = this.cookies.get(CSRF_COOKIE_NAME) ?? (await this.ensureCsrf());
+      headers[CSRF_HEADER_NAME] = csrf;
+    }
+
+    const request = this.build(path, { method, body: options.body, headers });
+    const { dispatch } = await loadHandler(method, path);
+
+    const membershipMatch = path.match(/\/members\/([^/]+)$/);
+    const storeMatch = path.match(/\/stores\/([^/]+)$/);
+    const derivedParams: Record<string, string> = membershipMatch
+      ? { membershipId: membershipMatch[1]! }
+      : storeMatch
+        ? { storeId: storeMatch[1]! }
+        : {};
+
+    const response = await dispatch(request, {
+      params: Promise.resolve({ ...derivedParams, ...(options.params ?? {}) }),
+    });
+
+    this.capture(response);
+    const body = (await response.json()) as JsonEnvelope<T>;
+
+    return { status: response.status, body, response };
+  }
+
+  get<T>(path: string, options?: { params?: Record<string, string> }) {
+    return this.request<T>("GET", path, options);
+  }
+
+  post<T>(path: string, body?: unknown, headers?: Record<string, string>) {
+    return this.request<T>("POST", path, { body, headers });
+  }
+
+  patch<T>(path: string, body?: unknown, params?: Record<string, string>) {
+    return this.request<T>("PATCH", path, { body, params });
+  }
+
+  delete<T>(path: string, params?: Record<string, string>) {
+    return this.request<T>("DELETE", path, { params });
+  }
+}
+
+type Handler = (
+  request: NextRequest,
+  context: { params: Promise<Record<string, string>> },
+) => Promise<NextResponse>;
+
+async function loadHandler(
+  method: "GET" | "POST" | "PATCH" | "DELETE",
+  path: string,
+): Promise<{ dispatch: Handler }> {
+  const normalized = path.replace(/\/$/, "");
+
+  const table: Record<string, () => Promise<Record<string, unknown>>> = {
+    "/api/auth/register": () => import("@/app/api/auth/register/route"),
+    "/api/auth/login": () => import("@/app/api/auth/login/route"),
+    "/api/auth/logout": () => import("@/app/api/auth/logout/route"),
+    "/api/auth/session": () => import("@/app/api/auth/session/route"),
+    "/api/organizations/current": () => import("@/app/api/organizations/current/route"),
+    "/api/organizations/current/members": () =>
+      import("@/app/api/organizations/current/members/route"),
+    "/api/organizations/current/stores": () =>
+      import("@/app/api/organizations/current/stores/route"),
+    "/api/organizations/current/audit": () => import("@/app/api/organizations/current/audit/route"),
+    "/api/invitations/accept": () => import("@/app/api/invitations/accept/route"),
+    "/api/organizations/switch": () => import("@/app/api/organizations/switch/route"),
+  };
+
+  if (table[normalized]) {
+    const handlers = (await table[normalized]()) as Record<string, unknown>;
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
+  const membership = normalized.match(/^\/api\/organizations\/current\/members\/([^/]+)$/);
+  if (membership) {
+    const handlers =
+      (await import("@/app/api/organizations/current/members/[membershipId]/route")) as Record<
+        string,
+        unknown
+      >;
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
+  const store = normalized.match(/^\/api\/organizations\/current\/stores\/([^/]+)$/);
+  if (store) {
+    const handlers =
+      (await import("@/app/api/organizations/current/stores/[storeId]/route")) as Record<
+        string,
+        unknown
+      >;
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
+  throw new Error(`Unknown route ${method} ${normalized}`);
+}
+
+export interface RegisteredUser {
+  client: ApiClient;
+  userId: string;
+  organizationId: string;
+  email: string;
+  password: string;
+}
+
+export const DEFAULT_PASSWORD = "correct horse battery staple";
+
+export async function registerViaApi(options: {
+  email: string;
+  name?: string;
+  organizationName: string;
+  password?: string;
+  storeName?: string;
+}): Promise<RegisteredUser> {
+  const client = new ApiClient();
+  await client.ensureCsrf();
+
+  const password = options.password ?? DEFAULT_PASSWORD;
+  const result = await client.post<{
+    user: { id: string };
+    organization: { id: string };
+  }>("/api/auth/register", {
+    email: options.email,
+    password,
+    name: options.name ?? "مالك تجريبي",
+    organizationName: options.organizationName,
+    ...(options.storeName ? { storeName: options.storeName } : {}),
+  });
+
+  if (result.status !== 201 || !result.body.data) {
+    throw new Error(`registration failed: ${JSON.stringify(result.body)}`);
+  }
+
+  return {
+    client,
+    userId: result.body.data.user.id,
+    organizationId: result.body.data.organization.id,
+    email: options.email,
+    password,
+  };
+}
+
+export async function loginViaApi(
+  email: string,
+  password: string,
+  client = new ApiClient(),
+): Promise<{ client: ApiClient; status: number; body: JsonEnvelope<unknown> }> {
+  await client.ensureCsrf();
+  const result = await client.post("/api/auth/login", { email, password });
+  return { client, status: result.status, body: result.body };
+}

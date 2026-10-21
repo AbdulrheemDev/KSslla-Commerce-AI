@@ -17,10 +17,10 @@ export const PRODUCT = {
   version: "0.1.0",
   designPartnerAr: "متجر كشخة",
   phase: {
-    number: 1,
-    label: "01",
-    titleAr: "التأسيس والمعمارية",
-    titleEn: "Foundation & Architecture",
+    number: 2,
+    label: "02",
+    titleAr: "المصادقة وتعدد المستأجرين",
+    titleEn: "Authentication & Multi-Tenancy",
   },
 } as const;
 
@@ -163,8 +163,8 @@ export const CURRENT_CAPABILITIES: readonly CapabilityStatus[] = [
     detailAr: "معمارية، أمان، بيانات، تعدد مستأجرين، وخارطة طريق موثّقة في المستودع.",
   },
   {
-    labelAr: "أساس تقني",
-    detailAr: "Next.js + TypeScript + Tailwind، مع فحص أنواع واختبارات وبوابة أسرار.",
+    labelAr: "هوية وعزل مستأجرين",
+    detailAr: "تسجيل ودخول بجلسات مخزّنة في PostgreSQL، كلمات مرور scrypt، وRLS على جداول المؤسسة.",
   },
   {
     labelAr: "إعدادات متحقَّق منها",
@@ -191,7 +191,11 @@ export const DATA_STATE: readonly {
   tone: "off" | "pending";
 }[] = [
   { componentAr: "بيانات المتجر", stateAr: "لا توجد بيانات بعد", tone: "off" },
-  { componentAr: "قاعدة البيانات", stateAr: "غير متصلة — Phase 02", tone: "pending" },
+  {
+    componentAr: "قاعدة البيانات",
+    stateAr: "PostgreSQL — تُفعّل بضبط DATABASE_URL",
+    tone: "pending",
+  },
   { componentAr: "اتصال Salla", stateAr: "غير متصل — Phase 03", tone: "pending" },
   { componentAr: "مزوّد الذكاء الاصطناعي", stateAr: "غير مهيأ — Phase 14", tone: "pending" },
 ] as const;
@@ -234,11 +238,11 @@ export const PRINCIPLES: readonly Principle[] = [
   },
 ] as const;
 
-export const PHASE_02_SCOPE: readonly string[] = [
-  "قاعدة PostgreSQL + Drizzle مع أولى الهجرات القابلة للمراجعة.",
-  "جداول النواة: المستخدمون، المؤسسات، العضويات، المتاجر، الجلسات، وسجل التدقيق.",
-  "مصادقة بجلسات مخزّنة في قاعدة البيانات وكلمات مرور Argon2id.",
-  "تحديد سياق المستأجر على الخادم واختبارات عزل صريحة.",
+export const PHASE_03_SCOPE: readonly string[] = [
+  "تطبيق Salla على Partners Portal مع Scopes دنيا.",
+  "Custom Mode مع state، وتبادل الرمز عبر النطاقات الرسمية فقط.",
+  "تشفير الرموز AES-256-GCM مع AAD لمعرّف المتجر.",
+  "تجديد single-flight، وفصل/إعادة ربط، وعرض حالة حقيقية بلا كتابة بيانات.",
 ] as const;
 
 export const DOCUMENTS: readonly { file: string; labelAr: string }[] = [

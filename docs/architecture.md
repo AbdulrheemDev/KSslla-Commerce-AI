@@ -42,26 +42,26 @@ KSHakha Commerce AI هو **AI Commerce Operating System** لمتاجر Salla، �
 
 **الاستنتاج:** المشروع Greenfield. لا يوجد كود قائم يستحق الحفاظ عليه، لذلك بُني حد أدنى من الأساس بدل إعادة بناء نظام غير موجود.
 
-### A.2 ما تم إنشاؤه في Phase 01
+### A.2 الحالة التقنية بعد Phase 02
 
 | الطبقة | التقنية / الحالة |
 |---|---|
 | Framework | Next.js **16.4.2** (App Router, Turbopack build) |
 | UI | React **19.3.1**، Tailwind CSS **4.3.3** (CSS-first tokens)، صفحة تأسيسية RTL |
 | Language | TypeScript **5.9.3**، `strict`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax` |
-| Backend | Route Handler واحد: `GET /api/health` |
-| Database | **لا توجد** — PostgreSQL وDrizzle مخططان لـ Phase 02 |
-| ORM / Migrations | **لا توجد** |
-| Authentication | **لا توجد** — مخططة لـ Phase 02 |
-| Authorization | **لا توجد** — التصميم موثّق فقط |
+| Backend | 13 Route Handler: صحة، مصادقة، جلسة، مؤسسة، أعضاء، دعوات، متاجر، تدقيق |
+| Database | **PostgreSQL 16+** مع 7 جداول وهجرتين (بنية + RLS) عبر Drizzle |
+| ORM / Migrations | Drizzle ORM **0.45.4** + drizzle-kit **0.31.11** |
+| Authentication | **منفّذة** — scrypt، جلسات مخزّنة، إبطال فوري، كوكي `__Host-` |
+| Authorization | **منفّذة** — RBAC بخمسة أدوار + RLS كطبقة ثانية |
 | AI | عقد `AiProvider` + `AiGateway` + سجل مزوّدين **فارغ** (بلا مزوّد) |
 | Salla integration | **لا توجد** — Phase 03 |
 | Queue / Workers | **لا توجد** — Phase 06 |
 | Logging | pino **10.4.0** مع تنقية مسارات حساسة |
 | Validation | Zod **4.6.7** (بيئة + مدخلات AI + مخرجات منظمة) |
-| Testing | Vitest **5.0.5** — اختبارات وحدة فقط |
+| Testing | Vitest **5.0.5** — وحدة + تكامل + أمن على PostgreSQL حقيقي |
 | Lint / Format | ESLint **9.39.5** (flat config) + Prettier **3.9.10** |
-| CI | GitHub Actions (lint → typecheck → test → secrets → build) |
+| CI | GitHub Actions (lint → typecheck → unit → PostgreSQL integration → secrets → build) |
 | Deployment | **غير مهيأ** — التصميم موثّق فقط |
 | Docs | `architecture`, `product-spec`, `roadmap`, `decisions`, `salla-reference`, `phase-02` |
 
@@ -70,12 +70,15 @@ KSHakha Commerce AI هو **AI Commerce Operating System** لمتاجر Salla، �
 - `src/lib/env.ts` — تحقق Zod من متغيّرات البيئة، كسول، لا يطبع القيم.
 - `src/lib/errors.ts` — تصنيف أخطاء موحّد مع ربط HTTP وحجب التفاصيل العامة.
 - `src/lib/logger.ts` — سجلات JSON مع `redact` للرموز وكلمات المرور.
-- `src/lib/ai/types.ts` — عقد المزوّد والطلب والنتيجة ونطاق المستأجر.
-- `src/lib/ai/registry.ts` — تسجيل المزوّدين ومنع الالتباس.
-- `src/lib/ai/gateway.ts` — محاولات، مهلة، تحقق JSON، إصلاح محدود، تسجيل بلا محتوى.
-- `src/config/product.ts` — بيانات المنتج والوحدات المخططة وحالة البيانات (client-safe).
-- `src/app/*` — واجهة تأسيسية عربية تعرض الحالة الفعلية فقط.
-- 43 اختبار وحدة تغطي البيئة، الأخطاء، السجل، سجل المزوّدين، وبوابة AI.
+- `src/lib/ai/*` — عقد المزوّد، سجل فارغ، وبوابة توليد. **لم يتغيّر في Phase 02.**
+- `src/db/` — اتصال postgres.js، `withTenantTransaction`، الهجرات، و7 جداول.
+- `src/modules/identity` — scrypt، رموز HMAC، مصفوفة صلاحيات، تسجيل/دخول/جلسات.
+- `src/modules/organizations` — المؤسسة، العضويات، الدعوات، وقواعد منع التصعيد.
+- `src/modules/stores` — سجلات داخلية `not_connected` مع عزل صريح.
+- `src/modules/audit` — سجل تدقيق append-only بلا أسرار.
+- `src/server/` — CSRF، معدّل الطلبات، سياق المستأجر، طبقة API موحّدة.
+- `src/app/*` — واجهة عربية RTL: دخول، تسجيل، تهيئة، مساحة مؤسسة، أعضاء، متاجر، دعوة.
+- 96 اختبارًا: 64 وحدة + 32 تكامل/أمن على PostgreSQL حقيقي.
 
 ### A.4 ما هو غير موجود بشكل مقصود
 

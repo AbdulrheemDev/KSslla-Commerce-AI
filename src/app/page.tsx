@@ -6,17 +6,17 @@ import {
   CURRENT_CAPABILITIES,
   DATA_STATE,
   DOCUMENTS,
-  PHASE_02_SCOPE,
+  PHASE_03_SCOPE,
   PLANNED_MODULES,
   PRINCIPLES,
   PRODUCT,
 } from "@/config/product";
 
 const COMPLETED_ARTIFACTS = [
-  "فحص المشروع وتوثيق الحالة الحالية",
-  "معمارية البيانات والأمان وتعدد المستأجرين",
-  "عقد طبقة ذكاء اصطناعي مستقل عن المزوّد",
-  "خارطة طريق وقرارات معمارية موثّقة",
+  "قاعدة PostgreSQL + Drizzle مع هجرات قابلة للمراجعة",
+  "تسجيل ودخول وخروج بجلسات قابلة للإبطال",
+  "مؤسسات وأدوار ودعوات مع مصفوفة صلاحيات",
+  "عزل بيانات مثبت باختبارات RLS على قاعدة حقيقية",
 ] as const;
 
 const HERO_CHIPS = [
@@ -55,6 +55,18 @@ export default function HomePage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <a
+            href="/login"
+            className="rounded-lg border border-line bg-surface-2 px-3 py-1.5 text-[11.5px] text-muted transition-colors hover:border-line-strong hover:text-ink"
+          >
+            تسجيل الدخول
+          </a>
+          <a
+            href="/register"
+            className="rounded-lg bg-gold px-3 py-1.5 text-[11.5px] font-semibold text-canvas transition-colors hover:bg-gold-soft"
+          >
+            إنشاء حساب
+          </a>
           <div className="hidden sm:block">
             <StatusPill tone="gold">
               <span className="ltr">Phase {PRODUCT.phase.label}</span>
@@ -72,9 +84,9 @@ export default function HomePage() {
         <section className="grid gap-10 pt-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-start lg:pt-14">
           <div>
             <div className="mb-6 flex flex-wrap items-center gap-2">
-              <StatusPill tone="teal">مرحلة التأسيس والمعمارية</StatusPill>
+              <StatusPill tone="teal">المصادقة وتعدد المستأجرين</StatusPill>
               <StatusPill tone="muted">
-                <span className="ltr">Foundation &amp; Architecture</span>
+                <span className="ltr">Authentication &amp; Multi-Tenancy</span>
               </StatusPill>
             </div>
 
@@ -98,9 +110,9 @@ export default function HomePage() {
             </ul>
 
             <p className="mt-7 max-w-xl rounded-xl border border-line bg-surface/50 p-4 text-[12.5px] leading-6 text-muted">
-              <span className="font-semibold text-ink">نطاق هذه المرحلة:</span> فحص وتوثيق وبناء
-              أساس تقني فقط — لا اتصال بـ <span className="ltr">Salla</span>، ولا عرض بيانات متجر،
-              ولا تنفيذ أي إجراء.
+              <span className="font-semibold text-ink">نطاق هذه المرحلة:</span> هوية ومؤسسات وأدوار
+              وعزل بيانات فقط — لا اتصال بـ <span className="ltr">Salla</span>، ولا بيانات متجر، ولا
+              تنفيذ أي إجراء.
             </p>
           </div>
 
@@ -146,7 +158,7 @@ export default function HomePage() {
             <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-line/70 bg-canvas/40 px-3.5 py-3">
               <span className="text-[11px] text-muted">المرحلة التالية</span>
               <span className="text-[12px] font-medium text-ink">
-                <span className="ltr text-gold">Phase 02</span> · المصادقة وتعدد المستأجرين
+                <span className="ltr text-gold">Phase 03</span> · ربط متجر Salla
               </span>
             </div>
           </aside>
@@ -259,13 +271,13 @@ export default function HomePage() {
             <div className="rounded-3xl border border-gold/20 bg-gradient-to-br from-gold/[0.07] via-surface/60 to-transparent p-6">
               <div className="flex items-center justify-between gap-3">
                 <span className="ltr text-[11px] font-semibold tracking-[0.2em] text-gold">
-                  Phase 02
+                  Phase 03
                 </span>
                 <StatusPill tone="gold">التالي</StatusPill>
               </div>
-              <h3 className="mt-3 text-xl font-semibold text-ink">المصادقة وتعدد المستأجرين</h3>
+              <h3 className="mt-3 text-xl font-semibold text-ink">ربط متجر Salla</h3>
               <ul className="mt-5 space-y-3">
-                {PHASE_02_SCOPE.map((item, index) => (
+                {PHASE_03_SCOPE.map((item, index) => (
                   <li
                     key={item}
                     className="flex items-start gap-3 text-[12.5px] leading-6 text-muted"
@@ -281,7 +293,7 @@ export default function HomePage() {
                 ))}
               </ul>
               <p className="mt-5 text-[11px] text-muted/70">
-                التفاصيل الكاملة في <span className="ltr">docs/phase-02.md</span>.
+                التفاصيل الكاملة في <span className="ltr">docs/roadmap.md</span>.
               </p>
             </div>
 
@@ -321,7 +333,7 @@ export default function HomePage() {
             </div>
           </div>
           <p className="text-[10.5px] leading-5 text-muted">
-            <span className="ltr">Phase 01 — Foundation &amp; Architecture</span>
+            <span className="ltr">Phase 02 — Authentication &amp; Multi-Tenancy</span>
             <span aria-hidden="true"> · </span>
             لا بيانات متجر معروضة
           </p>

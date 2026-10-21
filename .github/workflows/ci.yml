@@ -14,11 +14,28 @@ concurrency:
 
 jobs:
   verify:
-    name: Lint · Types · Tests · Secrets · Build
+    name: Lint · Types · Tests · PostgreSQL · Secrets · Build
     runs-on: ubuntu-latest
     env:
       NEXT_TELEMETRY_DISABLED: "1"
       NODE_ENV: test
+      # Integration tests run against the service below, not embedded PostgreSQL.
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      AUTH_SECRET: ci-only-auth-secret-at-least-32-characters
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,6 +57,9 @@ jobs:
 
       - name: Unit tests
         run: npm run test
+
+      - name: Integration tests (real PostgreSQL)
+        run: npm run test:integration
 
       - name: Secret scan
         run: npm run check:secrets
