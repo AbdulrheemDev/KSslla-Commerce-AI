@@ -348,7 +348,7 @@ Salla API / Webhooks
 | PII عملاء | داخلي/خارجي | كشف غير مصرح | تقليل، تشفير، صلاحيات، احتفاظ |
 | حسابات المستخدمين | مهاجم خارجي | تخمين/credential stuffing | scrypt، rate limit، كشف تسريب لاحقًا |
 | طبقة AI | محتوى متجر خبيث | prompt injection | فصل التعليمات، لا أدوات كتابة، تحقق مخرجات |
-| Webhooks | طرف ثالث | تزوير أحداث | توقيع HMAC + timing-safe + dedupe |
+| Webhooks | طرف ثالث | تزوير أحداث | توقيع موثّق + مقارنة timing-safe + dedupe |
 
 ### E.2 المصادقة (Authentication)
 
@@ -434,7 +434,7 @@ Internal Store UUID  ← يُستخدم في كل استعلام
 
 وفق وثائق Salla:
 
-1. التحقق من رأس `X-Salla-Security-Strategy` وقيمة `X-Salla-Signature` باستخدام HMAC-SHA256 على **الجسم الخام** وبالسر المشترك.
+1. التحقق من رأس `X-Salla-Security-Strategy` وقيمة `X-Salla-Signature` وفق آلية Salla الموثّقة (SHA-256 للجسم الخام باستخدام السر المشترك). **التفاصيل الدقيقة تُؤكد باختبار حقيقي في Phase 06** ولا تُفترض الآن.
 2. مقارنة **timing-safe**.
 3. رفض الطلب قبل أي parsing إذا فشل التحقق.
 4. قراءة الجسم الخام مرة واحدة، وتخزينه كما وصل.
@@ -578,6 +578,7 @@ Provider Adapter ──► HTTP SDK
 |---|---|---|---|---|
 | Core | Identity & Access | جلسات، عضويات | سياق مستأجر، صلاحيات | 02 |
 | Core | Stores | بيانات المتجر | Store Context | 02–03 |
+| Core | Billing (مؤجل) | خطة/استخدام | اشتراك وفوترة | 24–25 بعد التحقق من Salla Billing |
 | Store | Store Intelligence | مبيعات، منتجات، SEO، مخزون، عملاء | Health Score + تفسير | 07 |
 | Commerce | Catalog / Orders / Customers / Inventory | Salla APIs + Webhooks | نموذج موحّد | 04–05 |
 | Intelligence | Sales | طلبات، تواريخ، عروض | نمو، موسمية، AOV، منتجات رابحة | 08 |
