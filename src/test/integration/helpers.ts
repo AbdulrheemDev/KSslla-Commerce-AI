@@ -89,7 +89,7 @@ export class ApiClient {
     const { dispatch } = await loadHandler(method, path);
 
     const membershipMatch = path.match(/\/members\/([^/]+)$/);
-    const storeMatch = path.match(/\/stores\/([^/]+)$/);
+    const storeMatch = path.match(/\/stores\/([^/]+)/);
     const derivedParams: Record<string, string> = membershipMatch
       ? { membershipId: membershipMatch[1]! }
       : storeMatch
@@ -168,6 +168,44 @@ async function loadHandler(
     return { dispatch };
   }
 
+  const sallaAuthorize = normalized.match(
+    /^\/api\/organizations\/current\/stores\/([^/]+)\/salla\/authorize$/,
+  );
+  if (sallaAuthorize) {
+    const handlers =
+      (await import("@/app/api/organizations/current/stores/[storeId]/salla/authorize/route")) as Record<
+        string,
+        unknown
+      >;
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
+  const sallaConnection = normalized.match(
+    /^\/api\/organizations\/current\/stores\/([^/]+)\/salla\/connection$/,
+  );
+  if (sallaConnection) {
+    const handlers =
+      (await import("@/app/api/organizations/current/stores/[storeId]/salla/connection/route")) as Record<
+        string,
+        unknown
+      >;
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
+  if (normalized === "/api/integrations/salla/callback") {
+    const handlers = (await import("@/app/api/integrations/salla/callback/route")) as Record<
+      string,
+      unknown
+    >;
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
   const store = normalized.match(/^\/api\/organizations\/current\/stores\/([^/]+)$/);
   if (store) {
     const handlers =
@@ -236,4 +274,26 @@ export async function loginViaApi(
   await client.ensureCsrf();
   const result = await client.post("/api/auth/login", { email, password });
   return { client, status: result.status, body: result.body };
+}
+
+/**
+ * Invokes the OAuth callback route with the client's session cookie and returns
+ * the redirect target instead of a JSON body.
+ */
+export async function callbackViaApi(
+  client: ApiClient,
+  query: Record<string, string>,
+): Promise<{ status: number; location: string | null }> {
+  const { buildCallbackRequest } = await import("@/test/integration/salla-helpers");
+  const { GET } = await import("@/app/api/integrations/salla/callback/route");
+
+  const request = buildCallbackRequest(query, client.cookies);
+  const response = await GET(request);
+
+  for (const cookie of response.cookies.getAll()) {
+    if (cookie.value === "") client.cookies.delete(cookie.name);
+    else client.cookies.set(cookie.name, cookie.value);
+  }
+
+  return { status: response.status, location: response.headers.get("location") };
 }

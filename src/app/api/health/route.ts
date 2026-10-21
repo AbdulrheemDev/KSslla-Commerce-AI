@@ -5,6 +5,7 @@ import { PRODUCT } from "@/config/product";
 import { getDb } from "@/db/client";
 import { getSafeEnvSummary } from "@/lib/env";
 import { toPublicError } from "@/lib/errors";
+import { getSallaHealth } from "@/modules/integrations/salla/config";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,7 +14,8 @@ export const runtime = "nodejs";
  * Liveness/readiness probe.
  *
  * Reports configuration presence and a real database round-trip. Values are
- * never exposed, and Salla stays `not_configured` until Phase 03 is built.
+ * never exposed: the Salla entry is a boolean plus the selected OAuth mode, and
+ * it never includes the client id, client secret, token, or encryption key.
  */
 const NO_STORE = { "Cache-Control": "no-store" } as const;
 
@@ -41,6 +43,13 @@ export async function GET() {
       env.integrations.database === "configured" && process.env.AUTH_SECRET,
     );
 
+    const salla = (() => {
+      try {
+        return getSallaHealth();
+      } catch {
+        return { configured: false, oauthMode: "custom" as const, implemented: false };
+      }
+    })();
     const degraded = database === "unavailable";
 
     return NextResponse.json(
@@ -53,9 +62,16 @@ export async function GET() {
         checks: {
           database,
           auth: authConfigured ? "configured" : "not_configured",
-          salla: "not_configured",
+          salla: salla.configured ? "configured" : "not_configured",
         },
-        integrations: env.integrations,
+        integrations: {
+          ...env.integrations,
+          salla: {
+            configured: salla.configured,
+            oauthMode: salla.oauthMode,
+            oauthImplemented: salla.implemented,
+          },
+        },
         timestamp,
       },
       { status: degraded ? 503 : 200, headers: NO_STORE },

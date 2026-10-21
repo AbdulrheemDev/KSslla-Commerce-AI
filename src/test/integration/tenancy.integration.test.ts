@@ -25,10 +25,13 @@ describe("multi-tenancy and roles", () => {
     const storeId = created.body.data!.store.id;
 
     const own = await alpha.client.get<{
-      store: { id: string; connection: { state: string } };
+      store: { id: string };
+      connection: { status: string; connected: boolean };
     }>(`/api/organizations/current/stores/${storeId}`);
     expect(own.status).toBe(200);
-    expect(own.body.data?.store.connection.state).toBe("not_connected");
+    // No Salla connection yet: the API says so explicitly instead of implying one.
+    expect(own.body.data?.connection.status).toBe("disconnected");
+    expect(own.body.data?.connection.connected).toBe(false);
 
     const foreign = await beta.client.get(`/api/organizations/current/stores/${storeId}`);
     expect(foreign.status).toBe(404);

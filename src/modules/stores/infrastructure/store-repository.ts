@@ -1,7 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 
 import type { DbExecutor } from "@/db/executor";
-import { stores } from "@/db/schema";
+import { stores, type StoreStatus } from "@/db/schema";
 
 export type StoreRecord = typeof stores.$inferSelect;
 
@@ -56,4 +56,12 @@ export async function updateStoreName(
     .where(eq(stores.id, storeId))
     .returning();
   return row;
+}
+
+export async function updateStoreStatus(
+  db: DbExecutor,
+  storeId: string,
+  status: StoreStatus,
+): Promise<void> {
+  await db.update(stores).set({ status, updatedAt: new Date() }).where(eq(stores.id, storeId));
 }

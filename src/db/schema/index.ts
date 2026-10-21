@@ -6,3 +6,5 @@ export * from "@/db/schema/organization-members";
 export * from "@/db/schema/stores";
 export * from "@/db/schema/invitations";
 export * from "@/db/schema/audit-logs";
+export * from "@/db/schema/store-connections";
+export * from "@/db/schema/oauth-states";

@@ -26,6 +26,23 @@ export async function withTenantTransaction<T>(
   });
 }
 
+/**
+ * Resolves an OAuth state before the tenant is known.
+ *
+ * Only the row whose hash matches the transaction-local setting is visible
+ * (see the oauth_states RLS policy), so this cannot be used to browse states.
+ */
+export async function withOAuthStateLookup<T>(
+  db: Database,
+  stateHash: string,
+  work: (tx: Transaction) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('app.oauth_state_hash', ${stateHash}, true)`);
+    return work(tx);
+  });
+}
+
 /** Sets the organization after it has been created inside the same transaction. */
 export async function bindOrganization(tx: Transaction, organizationId: string): Promise<void> {
   await tx.execute(sql`select set_config('app.current_org', ${organizationId}, true)`);

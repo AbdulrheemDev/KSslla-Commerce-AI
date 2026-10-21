@@ -15,6 +15,20 @@
       "when": 1792622438400,
       "tag": "0001_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792623853740,
+      "tag": "0002_store_connections",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792623856909,
+      "tag": "0003_salla_rls",
+      "breakpoints": true
     }
   ]
 }

@@ -42,7 +42,7 @@ KSHakha Commerce AI هو **AI Commerce Operating System** لمتاجر Salla، �
 
 **الاستنتاج:** المشروع Greenfield. لا يوجد كود قائم يستحق الحفاظ عليه، لذلك بُني حد أدنى من الأساس بدل إعادة بناء نظام غير موجود.
 
-### A.2 الحالة التقنية بعد Phase 02
+### A.2 الحالة التقنية بعد Phase 03
 
 | الطبقة | التقنية / الحالة |
 |---|---|
@@ -76,13 +76,43 @@ KSHakha Commerce AI هو **AI Commerce Operating System** لمتاجر Salla، �
 - `src/modules/organizations` — المؤسسة، العضويات، الدعوات، وقواعد منع التصعيد.
 - `src/modules/stores` — سجلات داخلية `not_connected` مع عزل صريح.
 - `src/modules/audit` — سجل تدقيق append-only بلا أسرار.
+- `src/modules/integrations/salla` — نطاق OAuth، عميل البروتوكول، مدير الرموز، خدمة الاتصال، ومستودعات الحالة/الاتصال.
+- `src/lib/crypto.ts` — تشفير AES-256-GCM مع AAD للمستأجر.
 - `src/server/` — CSRF، معدّل الطلبات، سياق المستأجر، طبقة API موحّدة.
-- `src/app/*` — واجهة عربية RTL: دخول، تسجيل، تهيئة، مساحة مؤسسة، أعضاء، متاجر، دعوة.
-- 96 اختبارًا: 64 وحدة + 32 تكامل/أمن على PostgreSQL حقيقي.
+- `src/app/*` — واجهة عربية RTL: دخول، تسجيل، تهيئة، مساحة مؤسسة، أعضاء، متاجر، بطاقة ربط Salla، دعوة.
+- 9 جداول (أُضيف `store_connections` و`oauth_states`)، و3 هجرات RLS.
+- 170 اختبارًا: 106 وحدة + 64 تكامل/أمن على PostgreSQL حقيقي (منها 32 لـ Salla: 25 للتفويض/الاتصال و7 لإدارة الرموز).
+
+### A.2.1 مسار ربط Salla (Phase 03)
+
+```
+POST /api/organizations/current/stores/{id}/salla/authorize
+  → Session → Membership → Permission(store:connect) → Store (same org)
+  → state (256-bit) + HMAC → oauth_states row
+  → store_connections row (authorizing)
+  → 302 to accounts.salla.sa/oauth2/auth?…&state=…
+
+GET /api/integrations/salla/callback?code&state
+  → state lookup by HMAC (RLS: hash-only visibility)
+  → expiry → used → session/user → membership → store
+  → atomic consume (used_at IS NOT NULL check)
+  → POST /oauth2/token (form-urlencoded, single attempt)
+  → GET /oauth2/user/info (merchant.id = external store identity)
+  → AES-256-GCM encrypt with tenant AAD → store_connections
+  → audit → redirect to the store page
+```
+
+التجديد لا يمر بالـ callback: `getAccessToken()` هو المدخل الوحيد، ويقفل الصف قبل أي نداء خارجي، ويعيد قراءة `token_version` بعد القفل.
+
+### A.2.2 ما تغيّر في نموذج البيانات
+
+- حُذف `stores.external_store_id` ونقلت الهوية إلى `store_connections.external_store_id` (ADR-035).
+- `store_connections` فريد على `(store_id, provider)` لمنع تكرار الاتصال، وفريد جزئيًا على `(provider, external_store_id)` لمنع ربط متجر Salla واحد بمتجرين داخليين.
+- `oauth_states` يخزّن HMAC فقط، مع `expires_at` و`used_at` وربط كامل بالمستخدم/المؤسسة/المتجر.
 
 ### A.4 ما هو غير موجود بشكل مقصود
 
-لا قاعدة بيانات، لا OAuth، لا مزامنة، لا Webhooks، لا Dashboard، لا SEO، لا Marketing، لا Agent، لا بيانات متجر، لا أي مزوّد AI. هذه ليست نقصًا؛ بل **حدود المرحلة**.
+لا مزامنة منتجات/طلبات/عملاء/مخزون، لا Webhooks عامة (ولا `app.store.authorize`)، لا Dashboard بيانات، لا SEO، لا Marketing، لا Agent، لا أي مزوّد AI، ولا أي عملية كتابة إلى Salla. هذه ليست نقصًا؛ بل **حدود المرحلة**.
 
 ---
 

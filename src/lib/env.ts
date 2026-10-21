@@ -37,10 +37,15 @@ export const serverEnvSchema = z.object({
     )
     .optional(),
 
-  // Phase 03 — Salla app
+  // Phase 03 — Salla app (server-only)
   SALLA_CLIENT_ID: optionalText,
   SALLA_CLIENT_SECRET: optionalText,
   SALLA_REDIRECT_URI: z.url({ protocol: /^https?$/ }).optional(),
+  SALLA_OAUTH_MODE: z.enum(["custom", "easy"]).default("custom"),
+  // Development/test only. Rejected in production by the Salla config layer.
+  SALLA_AUTH_URL: z.url({ protocol: /^https?$/ }).optional(),
+  SALLA_TOKEN_URL: z.url({ protocol: /^https?$/ }).optional(),
+  SALLA_USERINFO_URL: z.url({ protocol: /^https?$/ }).optional(),
 
   // Phase 06 — Salla webhooks
   SALLA_WEBHOOK_SECRET: optionalText,

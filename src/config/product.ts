@@ -17,10 +17,10 @@ export const PRODUCT = {
   version: "0.1.0",
   designPartnerAr: "متجر كشخة",
   phase: {
-    number: 2,
-    label: "02",
-    titleAr: "المصادقة وتعدد المستأجرين",
-    titleEn: "Authentication & Multi-Tenancy",
+    number: 3,
+    label: "03",
+    titleAr: "ربط متجر Salla",
+    titleEn: "Salla OAuth & Store Connection",
   },
 } as const;
 

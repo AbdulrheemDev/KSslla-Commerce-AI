@@ -14,6 +14,14 @@ export const AUDIT_ACTIONS = [
   "member.removed",
   "store.created",
   "session.revoked",
+  "salla.authorization.started",
+  "salla.authorization.succeeded",
+  "salla.authorization.failed",
+  "salla.connection.created",
+  "salla.connection.updated",
+  "salla.connection.disconnected",
+  "salla.token.refreshed",
+  "salla.token.refresh_failed",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

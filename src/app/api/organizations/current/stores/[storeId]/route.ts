@@ -1,4 +1,5 @@
 import { getDb } from "@/db/client";
+import { getStoreConnection } from "@/modules/integrations/salla/application/connection-service";
 import { apiSuccess, withApi } from "@/server/api";
 import { requireOrganizationAccess } from "@/server/session";
 import { requireStoreAccess } from "@/modules/stores/application/store-service";
@@ -17,7 +18,9 @@ interface RouteContext {
 export const GET = withApi<RouteContext>(async (request, { params }) => {
   const { storeId } = await params;
   const context = await requireOrganizationAccess(request);
-  const store = await requireStoreAccess(getDb(), context, storeId);
+  const db = getDb();
+  const store = await requireStoreAccess(db, context, storeId);
+  const connection = await getStoreConnection(db, context, storeId);
 
   return apiSuccess({
     store: {
@@ -25,11 +28,7 @@ export const GET = withApi<RouteContext>(async (request, { params }) => {
       name: store.name,
       platform: store.platform,
       status: store.status,
-      // Phase 02 never contacts Salla; the UI must say so.
-      connection: {
-        state: "not_connected",
-        message: "Salla connection is available in the next phase.",
-      },
     },
+    connection,
   });
 });

@@ -1,8 +1,9 @@
 # Salla Integration Reference — Verified Facts Only
 
-> **تاريخ التحقق:** 2026-10-21  
+> **تاريخ التحقق:** 2026-10-21 (Phase 01/02) — أُعيد التحقق في **2026-10-22** لمسارات OAuth.  
 > **المصدر الوحيد:** الوثائق الرسمية [docs.salla.dev](https://docs.salla.dev/)  
-> **القاعدة:** لا يُكتب كود تكامل يعتمد على Endpoint أو Scope غير مسجّل هنا. أي معلومة غير مؤكدة تُعلَّم **⚠️ تحتاج تحققًا** ولا يُبنى عليها.
+> **القاعدة:** لا يُكتب كود تكامل يعتمد على Endpoint أو Scope غير مسجّل هنا. أي معلومة غير مؤكدة تُعلَّم **⚠️ تحتاج تحققًا** ولا يُبنى عليها.  
+> **سجل الأدلة الكامل لـ Phase 03:** §8. **تعارضات الوثائق:** §9.
 
 ---
 
@@ -38,12 +39,12 @@
 
 | Method | Endpoint | الغرض | Scope | الحالة | المصدر |
 |---|---|---|---|---|---|
-| GET | `https://accounts.salla.sa/oauth2/auth` | بدء التفويض | `offline_access` (للحصول على refresh) | ✅ موثّق | [Authorization](https://docs.salla.dev/authorization) |
-| POST | `https://accounts.salla.sa/oauth2/token` | تبادل code / تجديد | — | ✅ موثّق مبدئيًا | [Authorization](https://docs.salla.dev/authorization) |
-| GET | `https://accounts.salla.sa/oauth2/user/info` | هوية المستخدم/التاجر | — | ✅ موثّق | [User Information](https://docs.salla.dev/merchants/user-info) |
-| — | `https://s.salla.sa/apps/install/{app-id}` | رابط التثبيت | — | ✅ موثّق | [Authorization](https://docs.salla.dev/authorization) |
+| GET | `https://accounts.salla.sa/oauth2/auth` | بدء التفويض | `offline_access` (للحصول على refresh) | ✅ موثّق ومُنفَّذ | [Authorization](https://docs.salla.dev/doc-421118) |
+| POST | `https://accounts.salla.sa/oauth2/token` | تبادل code / تجديد | — | ✅ موثّق ومُنفَّذ | [Authorization](https://docs.salla.dev/doc-421118) |
+| GET | `https://accounts.salla.sa/oauth2/user/info` | هوية المستخدم/التاجر | — | ✅ موثّق ومُنفَّذ | [User Information](https://docs.salla.dev/merchants/user-info) |
+| — | `https://s.salla.sa/apps/install/{app-id}` | رابط التثبيت | — | ✅ موثّق (غير مُستخدَم آليًا) | [Authorization](https://docs.salla.dev/doc-421118) |
 
-**⚠️ تحتاج تحققًا (Phase 03):** الشكل الدقيق لطلب `/oauth2/token` (موضعه body مقابل query، وأسماء الحقول الإلزامية) واستجابته الكاملة. الوثائق تذكر `client_id`, `client_secret`, `grant_type=authorization_code`, `code`, `redirect_uri` كمعاملات OAuth، لكن المثال التنفيذي غير ظاهر في النسخة المقروءة.
+**الشكل النهائي لطلب الرمز (Phase 03، 2026-10-22):** `POST` إلى `https://accounts.salla.sa/oauth2/token` بجسم `application/x-www-form-urlencoded` يحتوي `grant_type`, `code`, `redirect_uri`, `client_id`, `client_secret` (أو `grant_type=refresh_token&refresh_token=…`). الأدلة في §8 الصفوف 2–4. الوثائق لا تعرض الجسم الخام؛ اعتمدنا RFC 6749 §4.1.3 (وهو ما يطبّقه عميل Salla الرسمي `SallaApp/oauth2-merchant`) ونسجّل ذلك كدليل ثانوي لا أساسي.
 
 ### 2.2 المتجر
 
@@ -99,8 +100,8 @@
 
 | الوضع | الوصف | قرارنا |
 |---|---|---|
-| **Easy Mode** | Salla تُرسل `app.store.authorize` عبر Webhook يحتوي الرموز بعد التثبيت | للدراسة/البديل |
-| **Custom Mode** | Redirect إلى callback مع `code` + `state`، ثم تبادل الرمز | **المسار الأساسي المبدئي** |
+| **Easy Mode** | Salla تُرسل `app.store.authorize` عبر Webhook يحتوي الرموز بعد التثبيت | **هدف الإنتاج** عند النشر في App Store؛ غير منفّذ (يتطلب Webhook) |
+| **Custom Mode** | Redirect إلى callback مع `code` + `state`، ثم تبادل الرمز | **المنفَّذ في Phase 03** (الوثائق تخصّصه للاختبار) |
 
 المصدر: [Authorization](https://docs.salla.dev/authorization).
 
@@ -401,3 +402,64 @@ offline_access
 - <https://docs.salla.dev/421413m0>
 - <https://docs.salla.dev/421123m0>
 - <https://docs.salla.dev/421120m0>
+
+
+---
+
+## 8. سجل أدلة Phase 03 (Claim / Source / URL / Verified At / Implementation Impact)
+
+كل قرار في كود Phase 03 يعود إلى صفّ هنا. «مصدر ثانوي» يعني أنه يدعم الفهم لكنه ليس نصًّا رسميًا في docs.salla.dev.
+
+| # | Claim | Source | URL | Verified At | Implementation Impact |
+|---|---|---|---|---|---|
+| 1 | عنوان التفويض هو `https://accounts.salla.sa/oauth2/auth` وأنواع المعاملات `client_id`, `response_type=code`, `redirect_uri`, `scope`, `state` | Salla Docs — Authorization | https://docs.salla.dev/doc-421118 | 2026-10-22 | `buildAuthorizationUrl()` يرسل هذه المعاملات فقط، دون أي حقل غير موثّق |
+| 2 | عنوان الرمز ونقطة التجديد هما `https://accounts.salla.sa/oauth2/token` | Salla Docs — Authorization | https://docs.salla.dev/doc-421118 | 2026-10-22 | ثابت واحد `SALLA_OFFICIAL_ENDPOINTS.tokenUrl` يُستخدم للتبادل والتجديد |
+| 3 | جسم طلب الرمز `application/x-www-form-urlencoded` يحتوي `grant_type`, `code`, `redirect_uri`, `client_id`, `client_secret` | RFC 6749 §4.1.3 + عميل Salla الرسمي (ثانوي) | https://github.com/SallaApp/oauth2-merchant/blob/master/src/Provider/Salla.php | 2026-10-22 | `exchangeAuthorizationCode()` يرسل الجسم كـ URLSearchParams مع `content-type` الصحيح؛ لا بيانات اعتماد في الـ URL |
+| 4 | التجديد يستخدم `grant_type=refresh_token` و`refresh_token` مع نفس بيانات العميل | Salla Docs — Authorization (وصف التجديد) + العميل الرسمي | https://docs.salla.dev/doc-421118 | 2026-10-22 | `refreshAccessToken()` يرسل الحقول الأربعة فقط |
+| 5 | `offline_access` شرط الحصول على refresh token | Salla Docs — Authorization (Important Notes) | https://docs.salla.dev/doc-421118 | 2026-10-22 | `SALLA_REQUIRED_SCOPES = ["offline_access"]`؛ لا سكوبات إضافية في Phase 03 |
+| 6 | صلاحية access token 14 يومًا | Salla Docs — Authorization + Get Started | https://docs.salla.dev/doc-421118 | 2026-10-22 | `ACCESS_TOKEN_FALLBACK_MS = 14d`، وتجديد استباقي قبل دقيقة |
+| 7 | صلاحية refresh token شهر واحد | Salla Docs — Get Started | https://docs.salla.dev/ | 2026-10-22 | `REFRESH_TOKEN_TTL_MS = 30d` يُخزَّن في `refresh_token_expires_at` |
+| 8 | `expires` يُعاد كثواني (Unix seconds) | Salla Docs — Authorization (Important Notes) | https://docs.salla.dev/doc-421118 | 2026-10-22 | `computeAccessTokenExpiry()` يقبل `expires` و`expires_in` ويتحمّل المللي ثانية |
+| 9 | refresh token أحادي الاستخدام ويُستبدل في كل تجديد | Salla Docs — Authorization | https://docs.salla.dev/doc-421118 | 2026-10-22 | `saveRefreshedTokens()` يخزّن الزوج الجديد ويرفع `token_version`، ولا يُعاد استخدام القديم |
+| 10 | إعادة استخدام refresh token تُبطل الـ refresh وكل access tokens المشتقة منه وتُلزم التاجر بإعادة التثبيت | Salla Docs — Authorization | https://docs.salla.dev/doc-421118 | 2026-10-22 | قفل تجديد على مستوى الصف (`refresh_lock_id` + `refresh_lock_expires_at` + `token_version`) يمنع أي تجديد متوازٍ |
+| 11 | خطأ التجديد الدائم يُعاد بصيغة `{"error":"invalid_grant","error_description":"…"}` مع HTTP 401 | Salla Docs — Responses | https://docs.salla.dev/responses | 2026-10-22 | `refreshAccessToken()` يرمي `sallaInvalidGrant()`؛ `token-manager` ينقل الحالة إلى `reauth_required` ويمسح الرموز |
+| 12 | **Easy Mode** هو الوحيد المسموح للتطبيقات المنشورة، والرموز تُسلَّم عبر Webhook `app.store.authorize` بلا Redirect/callback | Salla Docs — Authorization | https://docs.salla.dev/doc-421118 | 2026-10-22 | ADR-034: Easy Mode للمسار العام، لكن تنفيذه يتطلب Webhook (§9 تعارض 1)؛ الواجهة تُعلن `implemented: false` عند اختياره |
+| 13 | **Custom Mode** يتطلب redirect URI مسجّلًا ويعيد `?code=…&scope=…&state=…`، وهو موصوف «لأغراض الاختبار» | Salla Docs — Authorization | https://docs.salla.dev/doc-421118 | 2026-10-22 | Phase 03 ينفّذ Custom Mode فقط، ويُوثّق أن ترقية Easy Mode لا تعيد بناء نموذج الاتصال |
+| 14 | حدث `app.store.authorize` يحمل `access_token`, `expires`, `refresh_token`, `scope`, `token_type` و`merchant` | Salla Docs — App Events | https://docs.salla.dev/421413m0 | 2026-10-22 | مخطط التخزين يستوعب هذه الحقول مباشرة عند بناء مسار Easy Mode (خارج نطاق هذه المرحلة) |
+| 15 | `GET /oauth2/user/info` يعيد `data.merchant.id` وبيانات المتجر؛ المستخدم المفوِّض قد يكون عضو فريق لا المالك | Salla Docs — User Information | https://docs.salla.dev/merchants/user-info | 2026-10-22 | هوية المتجر الخارجية = `merchant.id` حصرًا؛ `external_user_id` = `data.id` ولا يُستخدم كهوية متجر |
+| 16 | `GET /store/info` يعيد `data.id` لبيانات المتجر | Salla Docs — Store Information | https://docs.salla.dev/merchants/store-info | 2026-10-22 | لم يُستدعَ في Phase 03 (يكفي `user/info` للهوية)؛ يُسجَّل قبل أي استخدام لاحق |
+| 17 | حدود المعدل تعتمد على خطة المتجر (Plus 120 / Pro 360 / Special 720 في الدقيقة) | Salla Docs — Rate Limiting | https://docs.salla.dev/rate-limiting | 2026-10-22 | `SallaRateLimitError` موجود في التصنيف، ولا ندّعي تنفيذ limiter متكامل قبل Phase 04 |
+| 18 | يُنصح باستخدام متجر تجريبي (Demo Store) للاختبار | Salla Docs — Authorization / Report Builder | https://docs.salla.dev/doc-421118 | 2026-10-22 | كل الاختبارات الآلية على mock محلي؛ لا يوجد اتصال بمتجر حقيقي أو بمتجر كشخة |
+| 19 | تثبيت التطبيق من `https://s.salla.sa/apps/install/{app-id}` | Salla Docs — Authorization | https://docs.salla.dev/doc-421118 | 2026-10-22 | يُذكر في `docs/phase-03.md` كخطوة تشغيلية للمالك؛ لا استدعاء آلي |
+
+---
+
+## 9. تعارضات الوثائق وقرارات الحفظ (Phase 03)
+
+لا يوجد تخمين: كل تعارض يُسجَّل هنا، ويُنفَّذ الخيار الأكثر تحفّظًا.
+
+### 9.1 فاصل السكوبات (space مقابل comma)
+
+- **التعارض:** مثال الـ callback في الوثائق يعرض `scope={app-scopes}+offline_access` (أي مسافة عند فك الترميز)، بينما عميل Salla الرسمي `oauth2-merchant` يعرّف `getScopeSeparator()` كـ `,`.
+- **القرار:** نرسل مسافة (`serializeScopes`)، مطابقةً لـ RFC 6749 §3.3 ومثال الوثائق في عنوان التفويض.
+- **الأثر:** نخزّن السكوبات كما تعيدها Salla (`token.scope` أو `app.store.authorize.data.scope`) بعد تطبيع يقبل الفاصلين، فلا تتأثر المقارنة بشكل الإرسال.
+- **الأثر المستقبلي:** إذا رفضت Salla التفويض بسبب السكوبات، يُعاد التحقق ويُسجَّل هنا قبل التغيير.
+
+### 9.2 جسم طلب الرمز غير معروض في الوثائق
+
+- **التعارض:** الوثائق تسرد المعاملات ولا تعرض مثال `curl` للجسم.
+- **القرار:** `application/x-www-form-urlencoded` في الجسم (RFC 6749 §4.1.3) + بيانات العميل في الجسم، وليس في الـ URL ولا في ترويسة Basic.
+- **الدليل الثانوي:** عميل Salla الرسمي يعتمد `league/oauth2-client` الذي يرسل `client_id`/`client_secret` في الجسم مع `grant_type`.
+- **الأثر:** لا تُسجَّل بيانات العميل في أي سجل HTTP؛ ولو تغيّرت الوثائق يُعدَّل موضع واحد فقط (`oauth-client.ts`).
+
+### 9.3 `expires` مقابل `expires_in`
+
+- **التعارض:** الوثائق تذكر `expires` كثواني Unix في قسم OAuth، ويستخدم حدث Webhook أيضًا `expires`؛ بينما استجابات OAuth الشائعة تستخدم `expires_in`.
+- **القرار:** نقبل الاثنين، ونفضّل `expires_in` عند وجوده، ونعتبر `expires` ثواني Unix مع تحمّل القيم بالمللي ثانية.
+- **الأثر:** إذا لم يوجد أي منهما نستخدم 14 يومًا الموثّقة، ويظهر ذلك في `tokens.ts` كـ fallback معلن لا كتخمين صامت.
+
+### 9.4 Easy Mode بلا callback
+
+- **التعارض:** أفضل مسار للنشر (Easy Mode) لا يمر عبر callback أصلًا، بينما Prompt Phase 03 يطلب تدفّق callback و`state`.
+- **القرار:** تنفيذ Custom Mode (الموثّق للاختبار) الآن، مع تصميم نموذج الاتصال بحيث يستقبل الرموز من أي مصدر (callback أو Webhook لاحقًا) عبر نفس `saveAuthorizedConnection`، وإعلان `implemented: false` عند `SALLA_OAUTH_MODE=easy` بدل الادعاء الكاذب.
+- **الأثر:** ADR-034 يشرح المسار، و`docs/phase-03.md` §القيود يذكر أن الإنتاج يستلزم Webhook `app.store.authorize` في مرحلة لاحقة.

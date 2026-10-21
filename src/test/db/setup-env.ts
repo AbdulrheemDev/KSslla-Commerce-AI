@@ -9,3 +9,6 @@ process.env.DATABASE_URL = appDatabaseUrl();
 process.env.AUTH_SECRET = "integration-test-auth-secret-value-32b";
 process.env.APP_URL = "http://localhost:3000";
 process.env.LOG_LEVEL = "silent";
+// Test-only encryption key. Tokens stored during tests are therefore decryptable
+// only with this key and never with a production secret.
+process.env.ENCRYPTION_KEY = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
