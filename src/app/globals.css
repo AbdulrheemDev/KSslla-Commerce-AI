@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #050b14;
+  --color-surface: #0a1424;
+  --color-surface-2: #0e1c30;
+  --color-line: #1b2c45;
+  --color-line-strong: #29415f;
+  --color-ink: #eef4fb;
+  --color-muted: #93a7c0;
+  --color-gold: #d8b46a;
+  --color-gold-soft: #f2dfb4;
+  --color-teal: #4fd1c5;
+  --color-rose: #f28b82;
+
+  --font-sans:
+    "Segoe UI", "SF Arabic", "Noto Kufi Arabic", "IBM Plex Sans Arabic", Tahoma, system-ui,
+    sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--color-gold) 30%, transparent);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 3px;
+  }
+}
+
+/* Subtle architectural grid used behind the hero. */
+.backdrop-grid {
+  background-image:
+    linear-gradient(to right, rgb(148 176 214 / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(148 176 214 / 0.06) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 0%, black 35%, transparent 78%);
+  mask-image: radial-gradient(ellipse 70% 55% at 50% 0%, black 35%, transparent 78%);
+}
+
+.gold-rule {
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--color-gold) 70%, transparent),
+    transparent
+  );
+}
+
+.ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
