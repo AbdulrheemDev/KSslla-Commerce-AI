@@ -968,3 +968,30 @@ offline_access
 - لذلك: `discounts.available = false`، وكل مقاييس الخصم `unavailable("discount_not_mirrored")`، مع ذكر المصدرين (`usedEndpoint` و`documentedIn`) في الحمولة والواجهة.
 - **التوسيع الممكن** (يحتاج موافقة المالك): تخزين `amounts.discounts[]` عبر نداء تفاصيل لكل طلب + أعمدة خصم في جدول منفصل. التكلفة: N نداءات لكل مزامنة وضغط على حدّ المعدل، وشكل استجابة موسوم بالإهمال.
 - **بديل مرفوض**: نداء تفاصيل عند كل طلب في كل تحليل — يخالف §17 (لا N+1) ويحوّل قراءةً إلى سلسلة نداءات خارجية.
+
+---
+
+## 17. سجل أدلة Phase 09 — ذكاء المنتجات
+
+> **تاريخ التحقق:** 2026-10-22. **المصادر:** صفحة `List Products` (§10)، وصفحة `Product Details`، وصفحة `Multi-Language Support`، وصفحة `List Orders` (§12).
+> هذه المرحلة **لا تنادي Salla إطلاقًا**: تقرأ ما حفظته Phase 04 وPhase 05 في PostgreSQL. الغرض من هذا القسم هو تثبيت أي حقل يقرأه المحرّك، وأي حقل موثّق **لا** يُقرأ ولماذا.
+
+| # | Claim | Source | URL | Verified At | Implementation Impact |
+|---|---|---|---|---|---|
+| 1 | `GET /admin/v2/products` بنطاق `products.read`؛ معاملات التصفية الموثّقة `keyword,status,category` | Salla Docs — List Products | https://docs.salla.dev/5394168e0 | 2026-10-22 | لا نداء جديد: المزامنة الموجودة (Phase 04) هي المصدر الوحيد للكتالوج |
+| 2 | مستند المنتج الموثّق يحمل `name` و`sku` و`url` و`metadata { title, description, url }` و`updated_at` و`images[]` و`sold_quantity` و`views` | Salla Docs — List Products (نموذج العنصر) | https://docs.salla.dev/5394168e0 | 2026-10-22 | `name`/`sku`/`url`/`metadata.title`/`metadata.description`/`updated_at` تُقرأ من النسخة المحلية؛ `views` و`images[]` و`sold_quantity` ليست محفوظة محليًا (صفوف 4–6) |
+| 3 | `Product Details` (`GET /admin/v2/products/{product}`، نطاق `products.read`) يوثّق `quantity` و`sold_quantity` و`views` و`images[]` مع `alt` و`skus[]` بحقول `stock_quantity`/`unlimited_quantity`/`barcode`/`gtin` | Salla Docs — Product Details | https://docs.salla.dev/5394169e0 | 2026-10-22 | الحقول موجودة على الخادم لكن جلبها يتطلب نداءً لكل منتج؛ رُفض (N+1) وسُجّل كقيد §17.1 |
+| 4 | `images[]` موثّق في القائمة والتفاصيل، لكن Phase 04 يحفظ `main_image` (أو `thumbnail`) في `products.image_url` فقط | Salla Docs — List Products | https://docs.salla.dev/5394168e0 | 2026-10-22 | `product.imageCount` و`product.imageAltText` يظهران `unavailable` بسببَي `images_not_mirrored` و`image_alt_not_mirrored`؛ لا يُستنتج العدد من رابط واحد |
+| 5 | `sold_quantity` موثّق في القائمة والتفاصيل، و**فترته غير موثّقة**؛ لا يذكر المرجع أي نافذة زمنية له | Salla Docs — List Products / Product Details | https://docs.salla.dev/5394168e0 | 2026-10-22 | يُعرض حصرًا كـ«كمية مبيعة تراكمية» من `inventory_levels`؛ لا قسمة على أيام ولا مقارنة بين فترات |
+| 6 | نموذج استجابة المنتج يوثّق `updated_at`، ولا يوثّق `created_at` للمنتج | Salla Docs — List Products | https://docs.salla.dev/5394168e0 | 2026-10-22 | `lifecycle.ageDays` = `unavailable("created_at_not_documented")`؛ لا عمر منتج مشتق من تاريخ التحديث |
+| 7 | لغة المحتوى تُختار لكل طلب عبر `Accept-Language`/`Content-Language` باستخدام `iso_code` من نقطة اللغات | Salla Docs — Multi-Language Support | https://docs.salla.dev/421122m0 | 2026-10-22 | المزامنة لا ترسل أيًّا من الترويستين، فالمحفوظ بلغة المتجر الافتراضية؛ قواعد المحتوى محايدة لغويًا ولا تدّعي لغة معيّنة |
+| 8 | بنود `List Orders` تحمل `name` و`quantity` و`thumbnail` فقط — بلا معرّف منتج وبلا سعر سطر | Salla Docs — List Orders (§12) | https://docs.salla.dev/5394146e0 | 2026-10-22 | `periodSales` و`revenue` لكل منتج = `unavailable("product_sales_not_linked")`؛ لا «الأكثر مبيعًا» ولا حصة إيراد |
+| 9 | `GET /admin/v2/products/quantities` (Phase 05) يعيد `quantity` و`sold_quantity` و`unlimited_quantity` لكل SKU | Salla Docs — List Product Quantities | https://docs.salla.dev/9612796e0 | 2026-10-22 | مصدر المخزون المفضّل في `commercial.ts`؛ وعند غيابه يُقرأ `products.quantity`، وعند غيابهما معًا `unavailable("no_stock_data")` |
+
+### 17.1 القيود المترتبة (لا تعارضات)
+
+- **الدليل 2 + 3:** الحقول التي تنقص النسخة المحلية (`views`، `images[].alt`، عدد الصور) موجودة في الـAPI لكن جلبها لكل منتج = N+1 على حدّ المعدل. القرار: لا نداءات إضافية، والحقول `unavailable` بسبب موثّق.
+- **الدليل 5:** `sold_quantity` لا يُقسم على أيام ولا يُقارن بفترة. أي طلب لـ«مبيعات المنتج هذا الشهر» يحتاج مصدرًا جديدًا موثّقًا، لا اشتقاقًا من هذا العداد.
+- **الدليل 6:** لا `created_at` ⇒ لا عمر منتج. `updated_at` يحكم `stale_content` وحده.
+- **الدليل 7:** جودة المحتوى تقيس وجود الحقول وأطوالها، لا جودة الصياغة ولا ملاءمتها اللغوية؛ ولا يُدّعى أي تأثير على ترتيب البحث.
+- **الدليل 8:** التصنيفات تُقاس كصحة **كتالوج** (عدد المنتجات ونقص الحقول)، لا كأداء مبيعات؛ `salesAttribution` يظل `unavailable("product_sales_not_linked")` في كل صف.
