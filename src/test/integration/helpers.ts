@@ -132,7 +132,9 @@ async function loadHandler(
   method: "GET" | "POST" | "PATCH" | "DELETE",
   path: string,
 ): Promise<{ dispatch: Handler }> {
-  const normalized = path.replace(/\/$/, "");
+  // The query string belongs to the request, not to the route: `?period=30d`
+  // must still resolve to `/…/overview`, exactly as the Next.js router does.
+  const normalized = path.replace(/\?.*$/, "").replace(/\/$/, "");
 
   const table: Record<string, () => Promise<Record<string, unknown>>> = {
     "/api/auth/register": () => import("@/app/api/auth/register/route"),
@@ -305,6 +307,30 @@ async function loadHandler(
 
   if (normalized === "/api/integrations/salla/callback") {
     const handlers = (await import("@/app/api/integrations/salla/callback/route")) as Record<
+      string,
+      unknown
+    >;
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
+  const intelligence = normalized.match(
+    /^\/api\/organizations\/current\/stores\/([^/]+)\/intelligence\/(overview|products|categories|inventory|customers|opportunities)$/,
+  );
+  if (intelligence) {
+    const endpoint = intelligence[2]!;
+    const handlers = (await (endpoint === "overview"
+      ? import("@/app/api/organizations/current/stores/[storeId]/intelligence/overview/route")
+      : endpoint === "products"
+        ? import("@/app/api/organizations/current/stores/[storeId]/intelligence/products/route")
+        : endpoint === "categories"
+          ? import("@/app/api/organizations/current/stores/[storeId]/intelligence/categories/route")
+          : endpoint === "inventory"
+            ? import("@/app/api/organizations/current/stores/[storeId]/intelligence/inventory/route")
+            : endpoint === "customers"
+              ? import("@/app/api/organizations/current/stores/[storeId]/intelligence/customers/route")
+              : import("@/app/api/organizations/current/stores/[storeId]/intelligence/opportunities/route"))) as Record<
       string,
       unknown
     >;
