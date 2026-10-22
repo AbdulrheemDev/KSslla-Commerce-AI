@@ -47,6 +47,20 @@ export const REASON_LABELS_AR: Record<string, string> = {
   no_orders_stored: "لا توجد طلبات محفوظة",
   history_starts_after_window: "سجل الطلبات يبدأ بعد بداية الفترة",
   some_products_missing_sales_data: "بعض المنتجات بلا بيانات مبيعات",
+
+  // Phase 08 — sales intelligence.
+  outside_history: "خارج السجل المحفوظ",
+  history_starts_mid_bucket: "بداية السجل داخل هذه الفترة",
+  no_orders_in_period: "لا طلبات في الفترة",
+  insufficient_baseline_orders: "طلبات الفترة السابقة أقل من الحد المطلوب",
+  insufficient_history: "السجل أقصر من الحد المطلوب",
+  discount_not_mirrored: "تفاصيل الخصم غير محفوظة في المتجر",
+  discount_data_not_available: "بيانات الخصم غير متاحة",
+  traffic_not_available: "بيانات الزيارات غير متاحة",
+  conversion_not_available: "بيانات التحويل غير متاحة",
+  cart_data_not_available: "بيانات السلال المهجورة غير متاحة",
+  pattern_detected: "نمط موسمي واضح",
+  no_clear_pattern: "لا نمط واضح",
 };
 
 export const CLASS_LABELS_AR: Record<ProductClass, string> = {

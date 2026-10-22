@@ -97,7 +97,7 @@ export function periodRequestFromSearch(search: URLSearchParams): PeriodRequest 
   };
 }
 
-function mapPeriodError(error: unknown): never {
+export function mapPeriodError(error: unknown): never {
   if (error instanceof InvalidPeriodError) {
     throw new AppError({
       code: "VALIDATION_FAILED",
@@ -108,7 +108,7 @@ function mapPeriodError(error: unknown): never {
   throw error;
 }
 
-async function resolveFreshness(
+export async function resolveFreshness(
   db: Database,
   context: TenantContext,
   storeId: string,

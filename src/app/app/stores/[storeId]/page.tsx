@@ -164,6 +164,20 @@ export default async function StoreSettingsPage({
         <span className="text-[11.5px] font-medium text-teal">فتح التحليل ←</span>
       </Link>
 
+      <Link
+        href={`/app/stores/${store.id}/sales-intelligence`}
+        className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface/50 px-5 py-4 transition hover:border-teal/40"
+      >
+        <span>
+          <span className="block text-sm font-semibold text-ink">تحليل المبيعات</span>
+          <span className="mt-1 block text-[11.5px] leading-6 text-muted">
+            إيراد وطلبات ومتوسط طلب واتجاهات وموسمية وشذوذ وتسرّب — مع تصدير CSV وتوضيح كل قيمة غير
+            متاحة.
+          </span>
+        </span>
+        <span className="text-[11.5px] font-medium text-teal">فتح التحليل ←</span>
+      </Link>
+
       <SimulatorNotice />
 
       <SallaConnectionCard
