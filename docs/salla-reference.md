@@ -716,7 +716,8 @@ offline_access
 | 12 | `sku_id` يميّز المتغيّرات، ونفس `id` يتكرر لكل متغيّر | List Product Quantities | https://docs.salla.dev/9612796e0 | 2026-10-22 | `quantity_key = "sku:<sku_id>"` أو `"product:<id>"`؛ اختبار وحدة يؤكد عدم اندماج المتغيّرات |
 | 13 | `price` يصل رقمًا أو نصًا | List Product Quantities | https://docs.salla.dev/9612796e0 | 2026-10-22 | يُطبَّع إلى `numeric(14,2)` نصًا بدقة منزلتين |
 | 14 | `X-RateLimit-*` و`Retry-After` موثّقة | Rate Limiting | https://docs.salla.dev/rate-limiting | 2026-10-22 | نفس آلية Phase 04؛ `Retry-After` يُحترم حرفيًا ولا تُقصَّر المدة |
-| 15 | `mobile_code` يأتي `"+966"` في الطلبات و`"967"` في العملاء، و`country_code` بين `"SA"` و`"sa"` | List Orders + List Customers | https://docs.salla.dev/5394146e0 | 2026-10-22 | يُحفظ النص كما وصل؛ يُطبَّع `country_code` إلى أحرف كبيرة للعرض فقط، والهاتف يُجمَّع للعرض دون تعديل المخزَّن |
+| 15 | `mobile_code` يأتي `"+966"` في الطلبات و`"967"` في العملاء، و`country_code` بين `"SA"` و`"sa"` | List Orders + List Customers | https://docs.salla.dev/5394146e0 | 2026-10-22 | يُحفظ `mobile_code` كما وصل ويُجمَّع للعرض فقط؛ `country_code` يُخزَّن بأحرف كبيرة لأن المزوّد يخلط الحالتين |
+| 16 | تفاصيل الطلب الكاملة تحمل حقولًا حسّاسة: `bank.iban_number`, `notes`, `payment_actions`, `source_details` إضافة إلى `customer` و`urls` | Order Details | https://docs.salla.dev/orders/details | 2026-10-22 | حمولة الطلب المحفوظة قائمة سماح تستبعدها كلها؛ لا تُختار ولا تُعرض ولا تُسجَّل (ADR-043) |
 
 ---
 

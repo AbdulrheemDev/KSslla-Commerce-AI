@@ -7,6 +7,7 @@ import { SallaConnectionCard } from "@/components/app/salla-connection-card";
 import { StatusPill } from "@/components/status-pill";
 import { getDb } from "@/db/client";
 import { getCommerceOverview } from "@/modules/catalog/application/catalog-service";
+import { getStoreDataOverview } from "@/modules/sync/application/store-data-sync-service";
 import { isAppError } from "@/lib/errors";
 import { getStoreConnection } from "@/modules/integrations/salla/application/connection-service";
 import { getSallaHealth } from "@/modules/integrations/salla/config";
@@ -41,6 +42,31 @@ export default async function StoreSettingsPage({
 
   const connection = await getStoreConnection(db, context, storeId);
   const overview = await getCommerceOverview(db, context, storeId);
+  const dataOverview = await getStoreDataOverview(db, context, storeId);
+
+  const number = new Intl.NumberFormat("ar-SA", { numberingSystem: "latn" });
+  // Provider timestamps are stored as wall clock; trimming to the minute keeps
+  // the footer honest without inventing an offset.
+  const short = (value: string | null): string =>
+    value ? `${value.slice(0, 16).replace("T", " ")}` : "—";
+  const dataTiles = [
+    {
+      label: "العملاء",
+      value: dataOverview.counts.customers,
+      href: `/app/customers?store=${storeId}`,
+    },
+    { label: "الطلبات", value: dataOverview.counts.orders, href: `/app/orders?store=${storeId}` },
+    {
+      label: "بنود الطلبات",
+      value: dataOverview.counts.orderItems,
+      href: `/app/orders?store=${storeId}`,
+    },
+    {
+      label: "أصناف المخزون",
+      value: dataOverview.counts.inventory,
+      href: `/app/inventory?store=${storeId}`,
+    },
+  ];
 
   const salla = (() => {
     try {
@@ -140,6 +166,35 @@ export default async function StoreSettingsPage({
         connected={connection.status === "connected"}
         missingScopes={missingScopes}
       />
+
+      <section className="rounded-2xl border border-line bg-surface/70 p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold text-ink">بيانات التجارة المحلية</h2>
+          <p className="text-[11.5px] text-muted">
+            أرقام من PostgreSQL فقط — لا تقديرات ولا بيانات وهمية.
+          </p>
+        </div>
+
+        <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {dataTiles.map((tile) => (
+            <Link
+              key={tile.label}
+              href={tile.href}
+              className="rounded-xl border border-line/70 bg-surface px-3 py-3 transition hover:border-teal/40"
+            >
+              <dt className="text-[11px] text-muted">{tile.label}</dt>
+              <dd className="mt-1 text-lg font-semibold text-ink">{number.format(tile.value)}</dd>
+            </Link>
+          ))}
+        </dl>
+
+        <p className="mt-3 text-[11.5px] leading-6 text-muted">
+          آخر طلب: {short(dataOverview.orders.lastOrderAt)} · مسودات:{" "}
+          {number.format(dataOverview.orders.drafts)} · بانتظار الدفع:{" "}
+          {number.format(dataOverview.orders.pendingPayment)} · آخر مزامنة مخزون:{" "}
+          {short(dataOverview.inventory.lastSyncedAt)}
+        </p>
+      </section>
 
       <section className="rounded-2xl border border-line bg-surface/40 p-5">
         <h2 className="text-sm font-semibold text-ink">حدود هذه المرحلة</h2>
