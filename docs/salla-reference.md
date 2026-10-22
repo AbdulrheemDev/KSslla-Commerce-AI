@@ -773,8 +773,12 @@ offline_access
 | ما يُوقَّع | جسم الطلب |
 | عيّنة Node | `crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('hex')` ثم مقارنة بـ `===` |
 | عيّنة PHP | تقرأ `php://input` (الجسم الخام) |
+| عدد الترويسات في التسليم | **ترويسان فقط**: `X-Salla-Security-Strategy` و`X-Salla-Signature`؛ لا ترويسة إصدار |
+| المقارنة | الوثيقة تنصّ صراحةً على استخدام **دالة مقارنة زمنية ثابتة** (timing-safe) |
 
 **تعارض موثّق (14.8.1):** العيّنة Node تعيد تسلسل الكائن، وPHP تقرأ الخام. التنفيذ هنا يعتمد **الجسم الخام** ومقارنة زمنية ثابتة — انظر ADR-045.
+
+> **تحقّق مستقل:** القيمة المتوقّعة لـ`HMAC-SHA256` على جسم الاختبار مأخوذة من `openssl dgst -sha256 -hmac` (بذرة اختبار ثابتة في `signature.test.ts`)، وليست محسوبة بالكود نفسه؛ وهذا يثبت أن الخوارزمية **مفتاحية** لا مجرّد `SHA256` غير مفتاحي كما قد يُفهم من نصّ الوثيقة.
 
 ### 14.3 غلاف الويبهوك
 
@@ -804,7 +808,22 @@ offline_access
 
 **أحداث التطبيق:** `app.store.authorize`, `app.installed`, `app.updated`, `app.uninstalled`, `app.trial.started`, `app.trial.expired`, `app.trial.canceled`, `app.subscription.started`, `app.subscription.expired`, `app.subscription.canceled`, `app.subscription.renewed`, `app.feedback.created`, `app.settings.updated`.
 
-> الوثيقة تعرض أسرًا أخرى (شحن، علامات تجارية، سلات، فواتير، عروض، مراجعات، فروع) لم تُستهلك في هذه المرحلة. تُحفظ عند وصولها وتُعلَّم `ignored`، ولا تُرفض (ADR-049).
+**أسر أخرى موثّقة (24 اسمًا) لم تُستهلك في هذه المرحلة:**
+
+| الأسرة | الأسماء (كما في جدول Salla) |
+|---|---|
+| Shipping Companies (5) | `shipping.zone.created`, `shipping.zone.updated`, `shipping.company.created`, `shipping.company.updated`, `shipping.company.deleted` |
+| Shipments (4) | `shipment.creating`, `shipment.created`, `shipment.cancelled`, `shipment.updated` |
+| Brand (3) | `brand.created`, `brand.updated`, `brand.deleted` |
+| Store (6) | `store.branch.created`, `store.branch.updated`, `store.branch.setDefault`, `store.branch.activated`, `store.branch.deleted`, `storetax.created` |
+| Cart (2) | `abandoned.cart`, `coupon.applied` |
+| Invoice (1) | `invoice.created` |
+| Special Offer (2) | `specialoffer.created`, `specialoffer.updated` |
+| Miscellaneous (1) | `review.added` |
+
+> هذه الأسماء **مُتحقَّق منها حرفيًا** من جدول الأحداث، وتُصنَّف `documented_not_consumed`: تُحفظ، ويُردّ عليها `2xx`، ولا يُبنى عليها أي إجراء. أي اسم خارج الجداول كلها يُصنَّف `unknown_event` بالمعالجة نفسها (ADR-049، ADR-052).
+
+**الإجمالي المُسجَّل:** 17 طلب + 11 منتج + 2 تصنيف + 4 عميل + 13 تطبيق = **47 حدثًا**، منها **اثنان مهجوران فقط** (`product.updated`, `product.available`).
 
 ### 14.5 سلوك التسليم
 
@@ -845,11 +864,19 @@ offline_access
 
 #### 14.8.4 أحداث مهجورة لا تزال تُسلَّم
 - `product.updated` و`product.available` موسومان كمهجورين، لكن ويبهوكات سابقة قد تستمر في إرسالهما.
-- **القرار:** يُعامَلان كالمنتج العادي (مزامنة قراءة)، بلا مسار خاص. (14.4)
+- **القرار:** يُزامَن المنتج كالمعتاد (مزامنة قراءة)، لكنهما يبقيان موسومين `deprecated` في السجل، ويُسجَّل الوسم في نتيجة المعالجة (`lifecycle: "deprecated"` + `deprecationNote`) حتى لا يُعرَضا كحدثين حاليّين. (ADR-052)
 
 #### 14.8.5 استراتيجية `Token`
 - الوثيقة تذكر `Token` كاستراتيجية ثانية دون تفصيل ترويساتها أو طريقة مقارنتها.
 - **القرار:** تُرفض التسليمات التي تعلن `Token` (`unsupported_strategy`) بدل قبول جسم غير متحقّق منه. (ADR-045)
+
+#### 14.8.6 غياب ترويسة الاستراتيجية
+- **الفجوة:** الوثيقة تقول إن Salla **تُسنِد** `Signature` افتراضيًا عند التسجيل بلا استراتيجية، لكنها **لا تنصّ** على سلوك المستقبِل عند غياب الترويسة.
+- **القرار (الأكثر تحفّظًا):** الغياب يُفسَّر كالافتراضي `Signature`، **بشرط** نجاح التوقيع؛ الغياب لا يعفي من التحقّق ولا يُحوّل أي تسليم إلى مقبول بلا توقيع. أي قيمة أخرى غير `Signature` تُرفض. (ADR-052)
+
+#### 14.8.7 ترويسة إصدار الويبهوك
+- **الفجوة:** الإصدار (`1` أو `2`) معامل **تسجيل**، وليس جزءًا من الغلاف الموثّق ولا من الترويسات الموصوفة.
+- **القرار:** لا يُقرأ الإصدار من أي ترويسة؛ العمود `event_version` يبقى `NULL` حتى توثّق Salla مصدرًا له لكل تسليم. قراءة ترويسة غير موثّقة كانت ستُخزّن قيمة مُختلقة. (ADR-052)
 
 ### 14.9 سجل أدلة Phase 06 (Claim / Source / URL / Verified At / Impact)
 
@@ -858,7 +885,7 @@ offline_access
 | 17 | التوقيع HMAC-SHA256 hex بطول 64 على جسم الطلب بمفتاح `secret` الويبهوك، مع ترويستَي `X-Salla-Security-Strategy` و`X-Salla-Signature` | Webhooks — Security | https://docs.salla.dev/webhooks | 2026-10-22 | `verifySallaWebhookSignature` على الجسم الخام + `timingSafeEqual` (ADR-045) |
 | 18 | الاستراتيجية الافتراضية `Signature`، و`Token` بديل غير مفصّل | Webhooks — Security | https://docs.salla.dev/webhooks | 2026-10-22 | غياب ترويسة الاستراتيجية مقبول إذا صحّ التوقيع؛ `Token` يُرفض |
 | 19 | معاملات التسجيل: `name,event,version(1|2),rule,url,headers,secret` | Webhooks — Register | https://docs.salla.dev/webhooks | 2026-10-22 | لا حقول تسجيل في الكود؛ الوثيقة هي المرجع عند التسجيل اليدوي |
-| 20 | "Salla currently uses API Version 2" | Webhooks | https://docs.salla.dev/webhooks | 2026-10-22 | يُخزَّن `event_version` من ترويسة الإصدار عند وجودها، ولا يُخمَّن |
+| 20 | "Salla currently uses API Version 2" والإصدار معامل تسجيل | Webhooks — Register | https://docs.salla.dev/webhooks | 2026-10-22 | لا تُقرأ ترويسة إصدار غير موثّقة؛ `event_version` يبقى `NULL` (14.8.7) |
 | 21 | غلاف `{event, merchant, created_at, data}` بلا معرّف حدث | Webhooks — Payload | https://docs.salla.dev/webhooks | 2026-10-22 | مخطط Zod للغلاف + بصمة جسم كمعرّف (ADR-048) |
 | 22 | مهلة ~30 ثانية و3 محاولات بفاصل ~5 دقائق | Webhooks — Retries | https://docs.salla.dev/webhooks | 2026-10-22 | الرد 2xx قبل المعالجة؛ عمل ثقيل في عامل منفصل |
 | 23 | كتالوج أحداث الطلبات (17) والمنتجات (11) والتصنيفات والعملاء | Store Events | https://docs.salla.dev/doc-421119 | 2026-10-22 | `classifyEvent` يطابق الأسماء حرفيًا |
@@ -867,3 +894,26 @@ offline_access
 | 26 | حمولات `app.installed/updated/uninstalled` موثّقة بالحقول | App Events | https://docs.salla.dev/421413m0 | 2026-10-22 | تُستخرج منها الهوية فقط؛ الباقي يُهمل |
 | 27 | `checkout_url`/`rating_link` أُزيلا 2025-05-25 لصالح `data.urls.*` | Order Events models | https://docs.salla.dev/doc-433804 | 2026-10-22 | لا يُقرأ أي رابط من الحمولة؛ المزامنة تقرأ من الـ API |
 | 28 | نماذج بيانات المنتجات تُعرض "No schema defined" | Product Webhook Events | https://docs.salla.dev/webhook-events/products | 2026-10-22 | لا تُستخرج حقول من الحمولة؛ المنتج يُقرأ من `GET /admin/v2/products` |
+| 29 | التسليم يحمل ترويستَي الأمان فقط، والمقارنة يجب أن تكون **timing-safe** | Webhooks — Verify Using Signature | https://docs.salla.dev/421119m0 | 2026-10-22 | `safeEqualHex` عبر `timingSafeEqual`؛ لا مقارنة `===` (ADR-045) |
+| 30 | أسماء أحداث الشحن والشحنات والعلامات والفروع والسلات والفواتير والعروض والمراجعات (24 اسمًا) | Store Events | https://docs.salla.dev/doc-421119 | 2026-10-22 | تُصنَّف `documented_not_consumed` لا `unknown` (14.4) |
+| 31 | `product.updated` و`product.available` مشطوبان في الجدول الرسمي | Store Events — Product | https://docs.salla.dev/doc-421119 | 2026-10-22 | وسم `deprecated` في السجل + `lifecycle` في نتيجة المعالجة (ADR-052) |
+| 32 | Salla تُسنِد `Signature` افتراضيًا عند التسجيل بلا استراتيجية؛ لا نصّ على سلوك المستقبِل عند الغياب | Webhooks — Register / Security | https://docs.salla.dev/doc-421119 | 2026-10-22 | الغياب = الافتراضي بشرط صحّة التوقيع؛ غير ذلك يُرفض (14.8.6) |
+| 33 | تبويب `Token` لا يُصيَّر نصًّا في الوثيقة؛ لا ترويسة ولا خوارزمية موثّقة له | Webhooks — Security Strategies | https://docs.salla.dev/421119m0 | 2026-10-22 | `Token` يُرفض بـ`unsupported_strategy` ولا يُخمَّن (14.8.5) |
+
+### 14.10 ترتيب قرار التحقّق (كما هو مُنفَّذ)
+
+الترتيب مقصود: كل خطوة تمنع الخطوة التي بعدها من أن تكون «قبولًا بالخطأ».
+
+| # | الحالة | النتيجة | الحالة HTTP | هل يُحفظ الحدث؟ |
+|---|---|---|---|---|
+| 1 | `SALLA_WEBHOOK_SECRET` غير مضبوط | `secret_not_configured` | 503 | لا |
+| 2 | لا ترويسة `X-Salla-Signature` | `missing_signature` | 401 | لا |
+| 3 | ترويسة استراتيجية بقيمة غير `Signature` (مثل `Token`) | `unsupported_strategy` | 401 | لا — ولو كان التوقيع صحيحًا |
+| 4 | توقيع ليس 64 حرفًا hex | `malformed_signature` | 401 | لا (بلا مقارنة أصلًا) |
+| 5 | توقيع صحيح الشكل لكنه لا يطابق | `invalid_signature` | 401 | لا |
+| 6 | استراتيجية غائبة + توقيع صحيح | مقبول كـ`Signature` | 200 | نعم |
+| 7 | استراتيجية `Signature` + توقيع صحيح | مقبول | 200 | نعم |
+
+- **لا يوجد مسار «تجاوز»**: لا `NODE_ENV`، ولا `bypass`، ولا قبول عند تعذّر المقارنة.
+- **لا يُسجَّل** السرّ ولا التوقيع المستلَم ولا المتوقَّع؛ السجل يحمل السبب فقط (`webhook.rejected` + `reason`).
+- التوقيع يُتحقَّق **قبل** `JSON.parse`؛ جسم غير JSON بتوقيع خاطئ يعطي **401** لا 400.

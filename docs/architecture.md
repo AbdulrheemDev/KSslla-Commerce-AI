@@ -59,7 +59,7 @@ KSHakha Commerce AI هو **AI Commerce Operating System** لمتاجر Salla، �
 | Queue / Workers | **منفّذة** — صندوق `webhook_events` + عامل `FOR UPDATE SKIP LOCKED` داخل العملية، بلا Redis/Kafka |
 | Logging | pino **10.4.0** مع تنقية مسارات حساسة |
 | Validation | Zod **4.6.7** (بيئة + مدخلات AI + مخرجات منظمة) |
-| Testing | Vitest **5.0.5** — 261 وحدة + 137 تكامل/أمن على PostgreSQL حقيقي |
+| Testing | Vitest **5.0.5** — 298 وحدة + 142 تكامل/أمن على PostgreSQL حقيقي |
 | Lint / Format | ESLint **9.39.5** (flat config) + Prettier **3.9.10** |
 | CI | GitHub Actions (lint → typecheck → unit → PostgreSQL integration → secrets → build) |
 | Deployment | **غير مهيأ** — التصميم موثّق فقط |
@@ -85,7 +85,7 @@ KSHakha Commerce AI هو **AI Commerce Operating System** لمتاجر Salla، �
 - `src/server/` — CSRF، معدّل الطلبات، سياق المستأجر، طبقة API موحّدة.
 - `src/app/*` — واجهة عربية RTL: دخول، تسجيل، تهيئة، مساحة مؤسسة، أعضاء، متاجر، بطاقة ربط Salla، منتجات وتصنيفات، طلبات/عملاء/مخزون، **أحداث الويبهوك**، دعوة.
 - 19 جدولًا (أُضيفت `products`, `categories`, `product_categories`, `sync_runs`, `sync_locks` في Phase 04، و`customers`, `orders`, `order_items`, `inventory_levels` في Phase 05، و`webhook_events` في Phase 06)، و11 هجرة.
-- 398 اختبارًا: 261 وحدة + 137 تكامل/أمن على PostgreSQL حقيقي (منها 35 لصندوق الويبهوك: تحقق التوقيع، الربط، التكرار، إعادة المحاولة، الرسالة الميتة، إعادة التشغيل، العزل، RBAC).
+- 440 اختبارًا: 298 وحدة + 142 تكامل/أمن على PostgreSQL حقيقي (منها 40 لصندوق الويبهوك: تحقق التوقيع بعقد الاستراتيجية، الربط، التكرار، إعادة المحاولة، الرسالة الميتة، إعادة التشغيل، العزل، RBAC).
 
 ### A.2.1 مسار ربط Salla (Phase 03)
 
