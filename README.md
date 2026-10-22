@@ -2,11 +2,25 @@
 
 > **نظام تشغيل ذكي للتجارة الإلكترونية** لمتاجر Salla. يفهم المتجر، يحلّل أداءه، يكتشف الفرص والمشكلات، يقترح الإجراءات، ثم ينفّذها بعد موافقة صريحة ويقيس أثرها.
 
-**الحالة الحالية:** `Phase 05 — Orders + Customers + Inventory Foundation` منفّذة تقنيًا وبانتظار مراجعة المالك.  
-**لا Webhooks، ولا تحليلات أو توقعات، ولا مزوّد ذكاء اصطناعي مربوط، ولا كتابة على أي متجر.**  
+**الحالة الحالية:** `Phase 06 — Webhooks + Sync Engine` منفّذة تقنيًا وبانتظار مراجعة المالك.  
+**لا مُجدول مزامنة، ولا تحليلات أو توقعات، ولا مزوّد ذكاء اصطناعي مربوط، ولا كتابة على أي متجر.**  
 **لم يُختبر الاستدعاء الحقيقي لـ Salla:** لا مفاتيح تطبيق ولا Demo Store في هذه البيئة؛ كل الاختبارات بروتوكولية على محاكي محلي.
 
 ---
+
+## ما تم في Phase 06
+
+- **نقطة استقبال عامة:** `POST /api/webhooks/salla` بلا جلسة وبلا CSRF وبلا أي معرّف مستأجر من العميل؛ الثقة الوحيدة هي التوقيع.
+- **تحقق قبل التحليل:** HMAC-SHA256 hex على **الجسم الخام** (لا `JSON.parse` ثم إعادة تسلسل) ومقارنة `timingSafeEqual`؛ استراتيجية `Token` تُرفض، وغياب السرّ يعطي 503 بدل قبول أعمى (ADR-045).
+- **صندوق وارد في قاعدة البيانات:** `webhook_events` بحالات `received → processing → processed | failed | dead_letter` و`ignored`/`unmatched` نهائيتان، وRLS مفروض مع سياق عامل وسياق استقبال ضيّق، وبلا سياسة DELETE (ADR-046).
+- **منع تكرار بلا معرّف حدث:** بصمة SHA-256 للجسم الخام بفهرس فريد `(provider, payload_hash)` + `on conflict do nothing`؛ التسليم المكرر يرد 200 مع `duplicate: true` ولا يكتب شيئًا (ADR-048).
+- **إقرار سريع:** الرد 2xx بعد التثبيت فقط، والمعالجة عبر `after()` في عامل `FOR UPDATE SKIP LOCKED`، ثم معاملة المستأجر لكل حدث.
+- **إعادة محاولة محدودة:** 1 دقيقة ثم 5 دقائق ثم `dead_letter`، وإعادة تشغيل محصورة بالمستأجر وتتطلب `store:sync` وتُدقَّق (ADR-049).
+- **محرّك مزامنة واحد:** `syncProducts/Categories/Orders/Customers/Inventory` يخدم المزامنة اليدوية والويبهوك (والمُجدول لاحقًا)، بدمج الأحداث وتشغيل ناجح كشرط للتغطية (ADR-048).
+- **أحداث التطبيق:** `app.store.authorize` يُسجَّل ولا يطبّق رموزًا، و`app.updated` لا يكتب فوق الحالة، و`app.uninstalled` يفصل الاتصال ويُبقي البيانات (ADR-050).
+- **واجهة عربية RTL:** `/app/webhooks` بعدّادات حقيقية وسجل أحداث وزر إعادة تشغيل محكوم بالصلاحية.
+- **اختبارات:** 82 اختبار وحدة و35 اختبار تكامل جديدًا للويبهوك (توقيع، تكرار متوازٍ، إعادة محاولة، `dead_letter`، إعادة تشغيل، Org A/Org B، RLS، RBAC، أسرار).
+- **الوثائق:** ADR-045…051 وسجل أدلة §14 في `docs/salla-reference.md` و`docs/phase-06.md`.
 
 ## ما تم في Phase 05
 
@@ -92,8 +106,8 @@ npm run dev
 
 | الأمر | ماذا يفعل |
 |---|---|
-| `npm test` | 146 اختبار وحدة (كلمات مرور، رموز، صلاحيات، تشفير، حالة OAuth، صلاحية الرموز، إعداد Salla، DTO، مappers، ترقيم، إعادة محاولة) |
-| `npm run test:integration` | 102 اختبار تكامل/أمن على **PostgreSQL حقيقي** (منها 67 لـ Salla بمحاكي بروتوكول محلي) |
+| `npm test` | 261 اختبار وحدة (كلمات مرور، رموز، صلاحيات، تشفير، حالة OAuth، صلاحية الرموز، إعداد Salla، DTO، mappers، ترقيم، إعادة محاولة، توقيع ويبهوك، آلة حالات الصندوق، إسقاط الحمولة) |
+| `npm run test:integration` | 137 اختبار تكامل/أمن على **PostgreSQL حقيقي** (منها 35 لصندوق الويبهوك، والبقية لـ Salla والهوية والعزل على محاكي بروتوكول محلي) |
 | `npm run verify` | تنسيق + lint + أنواع + كل الاختبارات + فحص الأسرار + بناء إنتاجي |
 
 `test:integration` يشغّل PostgreSQL 18 محليًا على المنفذ `55432` في `.pgdata-test/` (مُستثنى من Git)، وينشئ دورًا غير مالك `ksh_app` حتى تُفرض سياسات RLS فعليًا. في CI يُستخدم خدمة `postgres:16` عبر `TEST_DATABASE_URL`.
@@ -122,11 +136,13 @@ src/
 │   ├── stores/          # internal store records
 │   ├── catalog/         # DTO, mappers, repositories, read + sync services
 │   ├── integrations/    # Salla: domain / application / infrastructure
+│   ├── sync/            # paged-sync, store data sync, sync-engine
+│   ├── webhooks/        # inbox, signature, workers, handlers, replay
 │   └── audit/           # append-only audit log
 ├── server/              # CSRF, rate limit, session, API envelope
 └── test/                # embedded PostgreSQL harness + integration tests
-drizzle/                 # 0000_init … 0005_catalog_rls (6 migrations)
-docs/                    # architecture, product-spec, roadmap, decisions, salla-reference, phase-02…04
+drizzle/                 # 0000_init … 0010_webhook_events_rls (11 migrations)
+docs/                    # architecture, product-spec, roadmap, decisions, salla-reference, phase-02…06
 ```
 
 ## الوثائق
@@ -134,11 +150,12 @@ docs/                    # architecture, product-spec, roadmap, decisions, salla
 - [`docs/architecture.md`](docs/architecture.md) — المعمارية الكاملة (مصدر الحقيقة).
 - [`docs/product-spec.md`](docs/product-spec.md) — تعريف المنتج.
 - [`docs/roadmap.md`](docs/roadmap.md) — 25 مرحلة وبوابات G1–G5.
-- [`docs/decisions.md`](docs/decisions.md) — 40 قرارًا معماريًا بالسبب والبدائل.
+- [`docs/decisions.md`](docs/decisions.md) — 46 قرارًا معماريًا بالسبب والبدائل.
 - [`docs/salla-reference.md`](docs/salla-reference.md) — حقائق Salla الموثّقة فقط.
 - [`docs/phase-03.md`](docs/phase-03.md) — تنفيذ Phase 03: وضع OAuth، الرموز، القفل، الاختبارات، القيود.
 - [`docs/phase-04.md`](docs/phase-04.md) — تنفيذ Phase 04: نموذج الكتالوج، المزامنة، الترقيم، القفل، الواجهة، الاختبارات.
 - [`docs/phase-05.md`](docs/phase-05.md) — تنفيذ Phase 05: الطلبات والعملاء والمخزون، المشغّل المشترك، الخصوصية، القيود، الاختبارات.
+- [`docs/phase-06.md`](docs/phase-06.md) — تنفيذ Phase 06: التوقيع، الصندوق، العامل، إعادة المحاولة، إعادة التشغيل، القيود.
 - [`docs/phase-02.md`](docs/phase-02.md) — خطة Phase 02 وملاحظات التنفيذ.
 
 ## السكربتات
@@ -154,3 +171,4 @@ docs/                    # architecture, product-spec, roadmap, decisions, salla
 | `check:secrets` | فحص الملفات المتعقّبة |
 | `db:generate` / `db:migrate` / `db:studio` | Drizzle |
 | `verify` | البوابة الكاملة قبل الاعتماد |
+| `node scripts/simulate-webhook.mjs --scenario valid` | محاكي تسليم ويبهوك محليًا (يحتاج `SALLA_WEBHOOK_SECRET` و`APP_URL`). السيناريوهات: `valid`, `invalid-signature`, `duplicate`, `malformed`, `unknown-event`, `uninstalled`. بياناته محاكاة وليست من Salla. |

@@ -42,28 +42,28 @@ KSHakha Commerce AI هو **AI Commerce Operating System** لمتاجر Salla، �
 
 **الاستنتاج:** المشروع Greenfield. لا يوجد كود قائم يستحق الحفاظ عليه، لذلك بُني حد أدنى من الأساس بدل إعادة بناء نظام غير موجود.
 
-### A.2 الحالة التقنية بعد Phase 05
+### A.2 الحالة التقنية بعد Phase 06
 
 | الطبقة | التقنية / الحالة |
 |---|---|
 | Framework | Next.js **16.4.2** (App Router, Turbopack build) |
 | UI | React **19.3.1**، Tailwind CSS **4.3.3** (CSS-first tokens)، صفحة تأسيسية RTL |
 | Language | TypeScript **5.9.3**، `strict`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax` |
-| Backend | 24 Route Handler: صحة، مصادقة، جلسة، مؤسسة، أعضاء، دعوات، متاجر، تدقيق، Salla OAuth، كتالوج، وبيانات الطلبات/العملاء/المخزون |
-| Database | **PostgreSQL 16+** مع 18 جدولًا و9 هجرات (بنية + RLS + كتالوج + طلبات/عملاء/مخزون) عبر Drizzle |
+| Backend | 28 Route Handler: صحة، مصادقة، جلسة، مؤسسة، أعضاء، دعوات، متاجر، تدقيق، Salla OAuth، كتالوج، بيانات الطلبات/العملاء/المخزون، **استقبال ويبهوك عام، سجل/إعادة تشغيل، ومضخّة عامل داخلية** |
+| Database | **PostgreSQL 16+** مع 19 جدولًا و11 هجرة (بنية + RLS + كتالوج + طلبات/عملاء/مخزون + صندوق ويبهوك) عبر Drizzle |
 | ORM / Migrations | Drizzle ORM **0.45.4** + drizzle-kit **0.31.11** |
 | Authentication | **منفّذة** — scrypt، جلسات مخزّنة، إبطال فوري، كوكي `__Host-` |
 | Authorization | **منفّذة** — RBAC بخمسة أدوار + RLS كطبقة ثانية |
 | AI | عقد `AiProvider` + `AiGateway` + سجل مزوّدين **فارغ** (بلا مزوّد) |
-| Salla integration | **OAuth + قراءة الكتالوج والطلبات والعملاء والمخزون** — Custom Mode، قراءة فقط، محاكي بروتوكول فقط |
-| Queue / Workers | **لا توجد** — Phase 06 |
+| Salla integration | **OAuth + قراءة الكتالوج والطلبات والعملاء والمخزون + استقبال ويبهوك** — Custom Mode، قراءة فقط، محاكي بروتوكول فقط |
+| Queue / Workers | **منفّذة** — صندوق `webhook_events` + عامل `FOR UPDATE SKIP LOCKED` داخل العملية، بلا Redis/Kafka |
 | Logging | pino **10.4.0** مع تنقية مسارات حساسة |
 | Validation | Zod **4.6.7** (بيئة + مدخلات AI + مخرجات منظمة) |
-| Testing | Vitest **5.0.5** — 179 وحدة + 102 تكامل/أمن على PostgreSQL حقيقي |
+| Testing | Vitest **5.0.5** — 261 وحدة + 137 تكامل/أمن على PostgreSQL حقيقي |
 | Lint / Format | ESLint **9.39.5** (flat config) + Prettier **3.9.10** |
 | CI | GitHub Actions (lint → typecheck → unit → PostgreSQL integration → secrets → build) |
 | Deployment | **غير مهيأ** — التصميم موثّق فقط |
-| Docs | `architecture`, `product-spec`, `roadmap`, `decisions`, `salla-reference`, `phase-02…05` |
+| Docs | `architecture`, `product-spec`, `roadmap`, `decisions`, `salla-reference`, `phase-02…06` |
 
 ### A.3 ما هو موجود فعليًا في الكود
 
@@ -77,14 +77,15 @@ KSHakha Commerce AI هو **AI Commerce Operating System** لمتاجر Salla، �
 - `src/modules/stores` — سجلات داخلية مرتبطة أو غير مرتبطة، مع عزل صريح.
 - `src/modules/catalog` — DTO/Zod، mappers، ترقيم، سياسة إعادة محاولة، مستودعات المنتجات/التصنيفات، وخدمتا القراءة والمزامنة.
 - `src/modules/orders` / `src/modules/customers` / `src/modules/inventory` — DTO/Zod، mappers، مستودعات، وخدمات قراءة ومزامنة لكل مورد.
-- `src/modules/sync` — مشغّل الصفحات المشترك (`paged-sync`)، تطبيع أخطاء المزوّد، حالة المزامنة لخمسة موارد، ومشغّل `StoreDataSyncService`.
+- `src/modules/sync` — مشغّل الصفحات المشترك (`paged-sync`)، تطبيع أخطاء المزوّد، حالة المزامنة لخمسة موارد، ومشغّل `StoreDataSyncService`، و**`sync-engine.ts`** كواجهة موحّدة `syncProducts/Categories/Orders/Customers/Inventory`.
+- `src/modules/webhooks` — توقيع HMAC على الجسم الخام، غلاف Zod، كتالوج الأحداث، آلة حالات الصندوق، سياسة إعادة المحاولة، الاستقبال، العامل، المعالجات، وإعادة التشغيل.
 - `src/modules/audit` — سجل تدقيق append-only بلا أسرار.
 - `src/modules/integrations/salla` — نطاق OAuth، عميل البروتوكول، مدير الرموز، خدمة الاتصال، ومستودعات الحالة/الاتصال.
 - `src/lib/crypto.ts` — تشفير AES-256-GCM مع AAD للمستأجر.
 - `src/server/` — CSRF، معدّل الطلبات، سياق المستأجر، طبقة API موحّدة.
-- `src/app/*` — واجهة عربية RTL: دخول، تسجيل، تهيئة، مساحة مؤسسة، أعضاء، متاجر، بطاقة ربط Salla، منتجات وتصنيفات، طلبات/عملاء/مخزون، دعوة.
-- 18 جدولًا (أُضيفت `products`, `categories`, `product_categories`, `sync_runs`, `sync_locks` في Phase 04، و`customers`, `orders`, `order_items`, `inventory_levels` في Phase 05)، و9 هجرات.
-- 281 اختبارًا: 179 وحدة + 102 تكامل/أمن على PostgreSQL حقيقي (منها 67 لـ Salla: 25 تفويض/اتصال، 7 رموز، 22 كتالوج، 14 لبيانات الطلبات/العملاء/المخزون).
+- `src/app/*` — واجهة عربية RTL: دخول، تسجيل، تهيئة، مساحة مؤسسة، أعضاء، متاجر، بطاقة ربط Salla، منتجات وتصنيفات، طلبات/عملاء/مخزون، **أحداث الويبهوك**، دعوة.
+- 19 جدولًا (أُضيفت `products`, `categories`, `product_categories`, `sync_runs`, `sync_locks` في Phase 04، و`customers`, `orders`, `order_items`, `inventory_levels` في Phase 05، و`webhook_events` في Phase 06)، و11 هجرة.
+- 398 اختبارًا: 261 وحدة + 137 تكامل/أمن على PostgreSQL حقيقي (منها 35 لصندوق الويبهوك: تحقق التوقيع، الربط، التكرار، إعادة المحاولة، الرسالة الميتة، إعادة التشغيل، العزل، RBAC).
 
 ### A.2.1 مسار ربط Salla (Phase 03)
 
@@ -115,7 +116,7 @@ GET /api/integrations/salla/callback?code&state
 
 ### A.4 ما هو غير موجود بشكل مقصود
 
-لا مزامنة طلبات/عملاء/مخزون، ولا مزامنة مجدولة أو Webhooks عامة (ولا `app.store.authorize`)، لا Dashboard بيانات، لا SEO، لا Marketing، لا Agent، لا أي مزوّد AI، ولا أي عملية كتابة إلى Salla. هذه ليست نقصًا؛ بل **حدود المرحلة**.
+اكتملت مزامنة الطلبات/العملاء/المخزون واستقبال الويبهوك (بما فيه `app.store.authorize` و`app.uninstalled`). ما يبقى خارج النطاق عن قصد: المزامنة **المجدولة** (لا مُجدول في هذه المرحلة)، لوحات التحليل، SEO، Marketing، Agent، أي مزوّد AI، وأي عملية كتابة إلى Salla. هذه ليست نقصًا؛ بل **حدود المرحلة**.
 
 ---
 
@@ -189,7 +190,8 @@ src/
     (app)/                    # محمي بجلسة — لاحقًا
     api/
       health/route.ts         # موجود
-      webhooks/salla/route.ts # Phase 06
+      webhooks/salla/route.ts # Phase 06 — استقبال عام
+      internal/webhooks/drain # Phase 06 — مضخّة العامل
   components/                 # مكوّنات عرض مشتركة
   config/                     # بيانات منتج/ثوابت آمنة للعميل
   lib/
@@ -207,8 +209,9 @@ src/
     content/
     automation/
     governance/
+    webhooks/                 # Phase 06 — صندوق الوارد والعامل
   platform/                   # db, crypto, http, rate-limit, queue, ids
-  worker/                     # نقطة تشغيل العامل — Phase 06
+  worker/                     # عامل الويبهوك داخل العملية — Phase 06
 scripts/
 docs/
 ```
@@ -466,19 +469,18 @@ Internal Store UUID  ← يُستخدم في كل استعلام
 - رؤوس أمان مفعّلة في `next.config.ts`؛ **CSP مؤجلة إلى Phase 24** لأنها تحتاج nonce middleware.
 - لا تُعاد تفاصيل داخلية في الأخطاء العامة (`toPublicError`).
 
-### E.7 التحقق من Webhooks
+### E.7 التحقق من Webhooks (منفّذ في Phase 06)
 
-وفق وثائق Salla:
+وفق وثائق Salla (المرجع الكامل: `docs/salla-reference.md` §14):
 
-1. التحقق من رأس `X-Salla-Security-Strategy` وقيمة `X-Salla-Signature` وفق آلية Salla الموثّقة (SHA-256 للجسم الخام باستخدام السر المشترك). **التفاصيل الدقيقة تُؤكد باختبار حقيقي في Phase 06** ولا تُفترض الآن.
-2. مقارنة **timing-safe**.
-3. رفض الطلب قبل أي parsing إذا فشل التحقق.
-4. قراءة الجسم الخام مرة واحدة، وتخزينه كما وصل.
-5. الرد خلال نافذة Salla (30 ثانية) بعد حفظ الحدث، والمعالجة غير متزامنة.
-6. dedupe بمفتاح `(store_id, payload_hash/event_identity)`.
-7. سجل محاولات + مراقبة معدل فشل التوقيع.
-
-> Salla تُعيد المحاولة حتى 3 مرات بفواصل ~5 دقائق عند عدم نجاح الاستجابة. لا نعتمد على «مرة واحدة».
+1. `X-Salla-Signature` = HMAC-SHA256 hex (64 حرفًا) على **الجسم الخام** بسرّ الويبهوك؛ `X-Salla-Security-Strategy` تُقرأ وتُفحص (`Signature` مدعومة، وغيرها يُرفض).
+2. مقارنة **timing-safe** (`timingSafeEqual`) بعد فحص الطول.
+3. رفض التسليم قبل أي `JSON.parse` إذا فشل التحقق (401 عام).
+4. الجسم الخام يُقرأ مرة واحدة؛ **لا يُخزَّن**: يُخزَّن إسقاط بقائمة سماح فقط (ADR-047).
+5. الرد 2xx خلال أجزاء من الثانية بعد التثبيت، والمعالجة في عامل لاحق (`after()`).
+6. منع التكرار بـ`(provider, payload_hash)` وحده — لا معرّف حدث موثّق (ADR-048).
+7. سجل محاولات + `last_error_code` + عدّادات حالة، وتدقيق لكل انتقال.
+8. **إعادة محاولة Salla** (~30 ثانية، 3 محاولات ~5 دقائق) لا تُعتمد كآلية وحيدة: لدينا سياسة داخلية مستقلة (1 دقيقة / 5 دقائق / `dead_letter`).
 
 ### E.8 سجل التدقيق
 

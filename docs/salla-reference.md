@@ -744,3 +744,126 @@ offline_access
 
 - لا سرد موثوق للمحذوف في أي من النقاط الثلاث.
 - **القرار:** لا حذف تلقائي. `last_seen_at` يُحدَّث، والصف يبقى. (نفس سياسة Phase 04، ADR-038.)
+
+---
+
+## 14. سجل أدلة Phase 06 — الويبهوك وأحداث التطبيق
+
+> **تاريخ التحقق:** 2026-10-22. **المصادر:** `https://docs.salla.dev/webhooks`، `https://docs.salla.dev/doc-421119`، `https://docs.salla.dev/421413m0`، `https://docs.salla.dev/doc-433804`، `https://docs.salla.dev/webhook-events/products`.
+> كل ما بُني في هذه المرحلة مأخوذ من هذه الصفحات. ما لم يُذكر فيها **لم يُخترع**: لا معرّف حدث، ولا ترويسة إضافية، ولا نطاق (scope) جديد.
+
+### 14.1 التسجيل والشكل العام
+
+| العنصر | ما تقوله الوثيقة |
+|---|---|
+| طريقة التسجيل | `POST` على واجهة تسجيل الويبهوك في لوحة التطبيق، أو من إعدادات التطبيق في Salla |
+| معاملات التسجيل | `name`, `event`, `version` (1 أو 2), `rule`, `url`, `headers[{key,value}]`, `secret` |
+| إصدار الـ API | **"Salla currently uses API Version 2"**، والويبهوك الجديد يُسجَّل بـ `version: 2` افتراضيًا |
+| الرابط | HTTPS عام، ويُستقبل الحدث بـ `POST` |
+| المحتوى | `application/json` بغلاف موحّد (14.3) |
+
+### 14.2 الأمان والتوقيع
+
+| العنصر | ما تقوله الوثيقة |
+|---|---|
+| استراتيجيتان | `Signature` (**الافتراضية**) و`Token` |
+| ترويسة الاستراتيجية | `X-Salla-Security-Strategy: Signature` |
+| ترويسة التوقيع | `X-Salla-Signature` |
+| الخوارزمية | **HMAC-SHA256**، الناتج **hex بطول 64 حرفًا**، مفتاحه `secret` الخاص بالويبهوك |
+| ما يُوقَّع | جسم الطلب |
+| عيّنة Node | `crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('hex')` ثم مقارنة بـ `===` |
+| عيّنة PHP | تقرأ `php://input` (الجسم الخام) |
+
+**تعارض موثّق (14.8.1):** العيّنة Node تعيد تسلسل الكائن، وPHP تقرأ الخام. التنفيذ هنا يعتمد **الجسم الخام** ومقارنة زمنية ثابتة — انظر ADR-045.
+
+### 14.3 غلاف الويبهوك
+
+```json
+{
+  "event": "order.created",
+  "merchant": 1234509876,
+  "created_at": "2022-12-31 12:31:25",
+  "data": { "id": 1122334455 }
+}
+```
+
+- `merchant` هو **معرّف المتجر التجاري** (رقم)، وهو الهوية الوحيدة المتاحة لربط الحدث بمتجر.
+- **لا يوجد معرّف حدث** (`event id`/`delivery id`) في الغلاف — لذلك لا يمكن الاعتماد عليه في منع التكرار (14.8.2).
+- `created_at` بتوقيت بلا منطقة (`YYYY-MM-DD HH:mm:ss`)، مثل بقية طوابع Salla.
+
+### 14.4 كتالوج الأحداث
+
+**أحداث المتجر — الطلبات (17):**
+`order.created`, `order.updated`, `order.status.updated`, `order.cancelled`, `order.refunded`, `order.deleted`, `order.products.updated`, `order.payment.updated`, `order.coupon.updated`, `order.total.price.updated`, `order.shipment.creating`, `order.shipment.created`, `order.shipment.cancelled`, `order.shipment.return.creating`, `order.shipment.return.created`, `order.shipment.return.cancelled`, `order.shipping.address.updated`.
+
+**أحداث المتجر — المنتجات (11):**
+`product.created`, `product.updated` *(مهجور)*, `product.deleted`, `product.available` *(مهجور)*, `product.quantity.low`, `product.price.updated`, `product.status.updated`, `product.image.updated`, `product.category.updated`, `product.brand.updated`, `product.tags.updated`.
+
+**أحداث المتجر — التصنيفات والعملاء:**
+`category.created`, `category.updated`, `customer.created`, `customer.updated`, `customer.login`, `customer.otp.request`.
+
+**أحداث التطبيق:** `app.store.authorize`, `app.installed`, `app.updated`, `app.uninstalled`, `app.trial.started`, `app.trial.expired`, `app.trial.canceled`, `app.subscription.started`, `app.subscription.expired`, `app.subscription.canceled`, `app.subscription.renewed`, `app.feedback.created`, `app.settings.updated`.
+
+> الوثيقة تعرض أسرًا أخرى (شحن، علامات تجارية، سلات، فواتير، عروض، مراجعات، فروع) لم تُستهلك في هذه المرحلة. تُحفظ عند وصولها وتُعلَّم `ignored`، ولا تُرفض (ADR-049).
+
+### 14.5 سلوك التسليم
+
+| العنصر | ما تقوله الوثيقة |
+|---|---|
+| المهلة | **~30 ثانية** لكل محاولة |
+| عند الفشل | **3 محاولات إعادة** بفاصل **~5 دقائق** |
+| عند النجاح | تتوقف الإعادة |
+| أثر ذلك علينا | يجب أن يكون الرد 2xx سريعًا، والعمل الثقيل خارج دورة الطلب (ADR-046) |
+
+### 14.6 حمولات أحداث التطبيق (`app.*`)
+
+- `app.store.authorize` → `data`: `access_token`, `expires` (unix), `refresh_token`, `scope` (نص مفصول بمسافات), `token_type` (`bearer`). **لا يوجد `store id`**؛ الهوية الوحيدة هي `merchant`.
+- `app.installed` → `{ id, app_name, description, app_type, app_scopes[], installation_date, store_type }`.
+- `app.updated` → `{ id, app_name, description, app_type, categories[], app_scopes[], installation_date, update_date, store_type }`.
+- `app.uninstalled` → `{ id, app_name, app_description, app_type, categories[], installation_date, uninstallation_date, refunded, store_type }`.
+
+### 14.7 تغييرات موثّقة في حمولات الطلبات
+
+- `data.checkout_url` و`data.rating_link` أُزيلا في **2025-05-25**، والبديل `data.urls.checkout` و`data.urls.rating`.
+- `items.codes` و`items.files` مهجوران، والبديل `data.urls.digital_content`.
+- أربعة أحداث شحن تشترك في نموذج واحد، والعشرة أحداث طلب الأخرى تشترك في نموذج واحد.
+- تبويبات مخطط البيانات (`Data schema`) تُعرض بحالة "No schema defined" لأنها تُرسم بالجافاسكربت — لذلك لا تُستخرج قوائم الحقول منها ولا تُخمَّن.
+
+### 14.8 تعارضات وفجوات Phase 06
+
+#### 14.8.1 تسلسل الجسم في عيّنة Node
+- **التعارض:** العيّنة Node توقّع `JSON.stringify(req.body)`، وPHP تقرأ `php://input`.
+- **القرار:** يُوقَّع **الجسم الخام** حرفيًا كما وصل، بمقارنة `timingSafeEqual`. أي إعادة تسلسل تُغيّر المفاتيح/المسافات فتُبطل التوقيع. (ADR-045)
+
+#### 14.8.2 لا معرّف حدث موثّق
+- **الفجوة:** الغلاف لا يحمل `id` للحدث/التسليم.
+- **القرار:** مفتاح منع التكرار = **SHA-256 للجسم الخام**، بفهرس فريد `(provider, payload_hash)`. لا يُستخدم الوقت ولا `created_at` ولا معرّف استلام. (ADR-048)
+
+#### 14.8.3 هوية المتجر في الأحداث
+- **الواقع:** `merchant` رقم متجر؛ وبعض أحداث المنتجات/الطلبات تحمل `data.id` للمورد لا للمتجر.
+- **القرار:** الربط عبر `merchant → store_connections.external_store_id → store_id → organization_id` فقط. لا يُشتق المستأجر من أي حقل آخر في الحمولة. (ADR-046)
+
+#### 14.8.4 أحداث مهجورة لا تزال تُسلَّم
+- `product.updated` و`product.available` موسومان كمهجورين، لكن ويبهوكات سابقة قد تستمر في إرسالهما.
+- **القرار:** يُعامَلان كالمنتج العادي (مزامنة قراءة)، بلا مسار خاص. (14.4)
+
+#### 14.8.5 استراتيجية `Token`
+- الوثيقة تذكر `Token` كاستراتيجية ثانية دون تفصيل ترويساتها أو طريقة مقارنتها.
+- **القرار:** تُرفض التسليمات التي تعلن `Token` (`unsupported_strategy`) بدل قبول جسم غير متحقّق منه. (ADR-045)
+
+### 14.9 سجل أدلة Phase 06 (Claim / Source / URL / Verified At / Impact)
+
+| # | الادّعاء | المصدر | الرابط | تاريخ التحقق | الأثر في التنفيذ |
+|---|---|---|---|---|---|
+| 17 | التوقيع HMAC-SHA256 hex بطول 64 على جسم الطلب بمفتاح `secret` الويبهوك، مع ترويستَي `X-Salla-Security-Strategy` و`X-Salla-Signature` | Webhooks — Security | https://docs.salla.dev/webhooks | 2026-10-22 | `verifySallaWebhookSignature` على الجسم الخام + `timingSafeEqual` (ADR-045) |
+| 18 | الاستراتيجية الافتراضية `Signature`، و`Token` بديل غير مفصّل | Webhooks — Security | https://docs.salla.dev/webhooks | 2026-10-22 | غياب ترويسة الاستراتيجية مقبول إذا صحّ التوقيع؛ `Token` يُرفض |
+| 19 | معاملات التسجيل: `name,event,version(1|2),rule,url,headers,secret` | Webhooks — Register | https://docs.salla.dev/webhooks | 2026-10-22 | لا حقول تسجيل في الكود؛ الوثيقة هي المرجع عند التسجيل اليدوي |
+| 20 | "Salla currently uses API Version 2" | Webhooks | https://docs.salla.dev/webhooks | 2026-10-22 | يُخزَّن `event_version` من ترويسة الإصدار عند وجودها، ولا يُخمَّن |
+| 21 | غلاف `{event, merchant, created_at, data}` بلا معرّف حدث | Webhooks — Payload | https://docs.salla.dev/webhooks | 2026-10-22 | مخطط Zod للغلاف + بصمة جسم كمعرّف (ADR-048) |
+| 22 | مهلة ~30 ثانية و3 محاولات بفاصل ~5 دقائق | Webhooks — Retries | https://docs.salla.dev/webhooks | 2026-10-22 | الرد 2xx قبل المعالجة؛ عمل ثقيل في عامل منفصل |
+| 23 | كتالوج أحداث الطلبات (17) والمنتجات (11) والتصنيفات والعملاء | Store Events | https://docs.salla.dev/doc-421119 | 2026-10-22 | `classifyEvent` يطابق الأسماء حرفيًا |
+| 24 | `product.updated` و`product.available` مهجوران | Store Events | https://docs.salla.dev/doc-421119 | 2026-10-22 | يُقبلان كي لا تنكسر ويبهوكات قديمة |
+| 25 | `app.store.authorize` يحمل `access_token/refresh_token/expires/scope/token_type` وبلا `store id` | App Events | https://docs.salla.dev/421413m0 | 2026-10-22 | الحدث **يُسجَّل** ولا يُطبَّق؛ الرموز لا تُحفظ منه (ADR-050) |
+| 26 | حمولات `app.installed/updated/uninstalled` موثّقة بالحقول | App Events | https://docs.salla.dev/421413m0 | 2026-10-22 | تُستخرج منها الهوية فقط؛ الباقي يُهمل |
+| 27 | `checkout_url`/`rating_link` أُزيلا 2025-05-25 لصالح `data.urls.*` | Order Events models | https://docs.salla.dev/doc-433804 | 2026-10-22 | لا يُقرأ أي رابط من الحمولة؛ المزامنة تقرأ من الـ API |
+| 28 | نماذج بيانات المنتجات تُعرض "No schema defined" | Product Webhook Events | https://docs.salla.dev/webhook-events/products | 2026-10-22 | لا تُستخرج حقول من الحمولة؛ المنتج يُقرأ من `GET /admin/v2/products` |
