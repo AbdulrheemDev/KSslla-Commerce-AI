@@ -65,7 +65,7 @@ Organization → Store → Salla Connection → getAccessToken()
 
 ## 5. قاعدة البيانات
 
-هجرة `0006_phase05_orders_customers_inventory.sql` (Drizzle) + هجرة RLS يدوية `0007_commerce_rls.sql`.
+هجرة `0006_phase05_orders_customers_inventory.sql` (Drizzle) + هجرة RLS يدوية `0007_commerce_rls.sql` + هجرة `0008_orders_raw_payload.sql` (عمود `orders.raw_payload` بقائمة سماح، ADR-043).
 
 | الجدول | المفتاح الفريد | الغرض |
 |---|---|---|
@@ -236,7 +236,7 @@ syncStoreData(resource)
 | `lint` | ✅ 0 مشاكل |
 | `typecheck` | ✅ |
 | `test` (وحدة) | ✅ 179 اختبارًا على 24 ملفًا |
-| `test:integration` | ✅ 101 اختبارًا على 8 ملفات |
+| `test:integration` | ✅ 102 اختبارًا على 8 ملفات |
 | `build` | ✅ |
 | `check:secrets` | ✅ |
 | قاعدة بيانات جديدة | ✅ 8 هجرات على قاعدة فارغة + بذور المحاكي + تشغيل التطبيق |

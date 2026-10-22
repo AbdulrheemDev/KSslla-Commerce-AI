@@ -59,7 +59,7 @@ KSHakha Commerce AI هو **AI Commerce Operating System** لمتاجر Salla، �
 | Queue / Workers | **لا توجد** — Phase 06 |
 | Logging | pino **10.4.0** مع تنقية مسارات حساسة |
 | Validation | Zod **4.6.7** (بيئة + مدخلات AI + مخرجات منظمة) |
-| Testing | Vitest **5.0.5** — 179 وحدة + 101 تكامل/أمن على PostgreSQL حقيقي |
+| Testing | Vitest **5.0.5** — 179 وحدة + 102 تكامل/أمن على PostgreSQL حقيقي |
 | Lint / Format | ESLint **9.39.5** (flat config) + Prettier **3.9.10** |
 | CI | GitHub Actions (lint → typecheck → unit → PostgreSQL integration → secrets → build) |
 | Deployment | **غير مهيأ** — التصميم موثّق فقط |
@@ -84,7 +84,7 @@ KSHakha Commerce AI هو **AI Commerce Operating System** لمتاجر Salla، �
 - `src/server/` — CSRF، معدّل الطلبات، سياق المستأجر، طبقة API موحّدة.
 - `src/app/*` — واجهة عربية RTL: دخول، تسجيل، تهيئة، مساحة مؤسسة، أعضاء، متاجر، بطاقة ربط Salla، منتجات وتصنيفات، طلبات/عملاء/مخزون، دعوة.
 - 18 جدولًا (أُضيفت `products`, `categories`, `product_categories`, `sync_runs`, `sync_locks` في Phase 04، و`customers`, `orders`, `order_items`, `inventory_levels` في Phase 05)، و9 هجرات.
-- 280 اختبارًا: 179 وحدة + 101 تكامل/أمن على PostgreSQL حقيقي (منها 67 لـ Salla: 25 تفويض/اتصال، 7 رموز، 22 كتالوج، 13 لبيانات الطلبات/العملاء/المخزون).
+- 281 اختبارًا: 179 وحدة + 102 تكامل/أمن على PostgreSQL حقيقي (منها 67 لـ Salla: 25 تفويض/اتصال، 7 رموز، 22 كتالوج، 14 لبيانات الطلبات/العملاء/المخزون).
 
 ### A.2.1 مسار ربط Salla (Phase 03)
 

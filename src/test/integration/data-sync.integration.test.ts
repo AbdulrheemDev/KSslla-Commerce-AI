@@ -327,6 +327,43 @@ describe("order sync", () => {
       expect(line.productName.length).toBeGreaterThan(0);
     }
   });
+
+  it("stores an allowlisted snapshot and never the embedded customer", async () => {
+    const owner = await ownerWithStore("orders-snapshot@example.test");
+    await connect(owner);
+    seedOrders(2);
+
+    await syncStoreData(
+      getTestDb(),
+      contextFor(owner),
+      { storeId: owner.storeId, resource: "orders" },
+      META,
+    );
+
+    const rows = await withTenantTransaction(
+      getTestDb(),
+      { organizationId: owner.organizationId },
+      (tx) =>
+        tx.select({ raw: orders.rawPayload }).from(orders).where(eq(orders.storeId, owner.storeId)),
+    );
+
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.raw).toBeTruthy();
+      const stored = JSON.stringify(row.raw);
+
+      // The embedded customer is PII: it must not exist in any form.
+      expect(row.raw).not.toHaveProperty("customer");
+      expect(row.raw).not.toHaveProperty("urls");
+      expect(stored).not.toContain("@");
+      expect(stored).not.toContain("5123456");
+      expect(stored).not.toContain("عميل");
+    }
+
+    // What remains is the documented order shape.
+    expect(rows[0]!.raw).toMatchObject({ source: "web", payment_method: "mada", draft: false });
+    expect(Array.isArray((rows[0]!.raw as { items?: unknown }).items)).toBe(true);
+  });
 });
 
 describe("customer sync", () => {
