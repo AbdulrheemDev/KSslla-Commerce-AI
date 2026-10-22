@@ -995,3 +995,34 @@ offline_access
 - **الدليل 6:** لا `created_at` ⇒ لا عمر منتج. `updated_at` يحكم `stale_content` وحده.
 - **الدليل 7:** جودة المحتوى تقيس وجود الحقول وأطوالها، لا جودة الصياغة ولا ملاءمتها اللغوية؛ ولا يُدّعى أي تأثير على ترتيب البحث.
 - **الدليل 8:** التصنيفات تُقاس كصحة **كتالوج** (عدد المنتجات ونقص الحقول)، لا كأداء مبيعات؛ `salesAttribution` يظل `unavailable("product_sales_not_linked")` في كل صف.
+
+---
+
+## 18. سجل أدلة Phase 10 — ذكاء المخزون
+
+> **تاريخ التحقق:** 2026-10-22. **المصدر:** صفحة `List Products Quantities` المعتمدة في §12.5.
+> هذه المرحلة **لا تنادي Salla إطلاقًا**: تقرأ جدول `inventory_levels` الذي تكتبه Phase 05 من هذه النقطة. الغرض من هذا القسم هو تثبيت ما تحمله الاستجابة فعلًا، و**غياب** ما تحتاجه مقاييس التنبؤ (فترة، ختم زمني، سعر وحدة، مهلة توريد).
+
+| # | Claim | Source | URL | Verified At | Implementation Impact |
+|---|---|---|---|---|---|
+| 1 | `GET /admin/v2/products/quantities` يوثّق نطاق `products.read` فقط (لا نطاق مخزون منفصل)، ومصادقة Bearer | Salla Docs — List Product Quantities | https://docs.salla.dev/9612796e0 | 2026-10-22 | لا نطاق جديد ولا موافقة جديدة مطلوبة للمخزون؛ المزامنة القائمة (Phase 05) تغطي المصدر |
+| 2 | عنصر الاستجابة الموثّق يحمل `id`, `name`, `image`, `sku_id`, `sku`, `quantity`, `sold_quantity`, `price`, `unlimited_quantity`, `variant` | Salla Docs — List Product Quantities | https://docs.salla.dev/9612796e0 | 2026-10-22 | هذه الحقول بالضبط هي ما يقرأه `mapQuantity` ويُخزَّن في `inventory_levels`؛ لا حقل إضافي في المحرّك |
+| 3 | لا يحمل عنصر الاستجابة أي **ختم زمني** ولا **فترة بيع** ولا حقل «حتى تاريخ» | Salla Docs — List Product Quantities | https://docs.salla.dev/9612796e0 | 2026-10-22 | `sold_quantity` عدّاد تراكمي فقط: لا يُقسَم على أيام، ولا يُحوَّل إلى معدل طلب، ولا يُقارَن بين نافذتين. سبب `product_demand_not_linked` |
+| 4 | `sku_id` يكون `null` للمنتج بلا متغيّرات، ويظهر المنتج متعدّد المتغيّرات **صفًّا لكل `sku_id`** | Salla Docs — List Product Quantities | https://docs.salla.dev/9612796e0 | 2026-10-22 | مفتاح الصف `sku:<sku_id>` أو `product:<id>` (Phase 05). ذكاء المخزون **يجمع صفوف المتغيّرات** لكل منتج (6 + 1 = 7)؛ لا يُقرأ صف واحد كأنه المنتج |
+| 5 | مثال الاستجابة الموثّق يُظهر منتجات `unlimited_quantity: true` مع `quantity: 0` | Salla Docs — List Product Quantities | https://docs.salla.dev/9612796e0 | 2026-10-22 | `unlimited` يتقدّم على الرقم في `classifyStock`؛ قراءة الصفر «نافدًا» تُنتج إنذارًا كاذبًا |
+| 6 | `price` يظهر رقمًا في مثال ونصًّا في مثال آخر | Salla Docs — List Product Quantities | https://docs.salla.dev/9612796e0 | 2026-10-22 | لا يستخدمه ذكاء المخزون؛ التحويل المالي يبقى مسؤولية `mapQuantity` (Phase 05) |
+| 7 | صفحة النقطة تربط فقط عمليات **كتابة** (`Update Bulk Quantities`, `List Quantity Change Reasons`)؛ لا نقطة قراءة لتاريخ التغيّر موثّقة على هذه الصفحة | Salla Docs — List Product Quantities | https://docs.salla.dev/9612796e0 | 2026-10-22 | لا يُبنى سجل تاريخ من نقطة غير موثّقة؛ ADR-043 يبقى قائمًا (حالة حالية، لا لقطات) |
+| 8 | الاستجابة مُصفّحة (`pagination { count, total, perPage, currentPage, totalPages, links }`) بمعاملَي `page` و`per_page` | Salla Docs — List Product Quantities | https://docs.salla.dev/9612796e0 | 2026-10-22 | لا تغيير: المزامنة القائمة تقرأ كل الصفحات وتُحدِّث صفًا لكل مفتاح |
+
+### 18.1 القيود المترتبة (لا تعارضات)
+
+- **الدليل 3 هو أصل قيود هذه المرحلة.** بدونه لا معدل طلب، وبالتالي لا:
+  - أيام متبقية (`daysOfStock`)؛
+  - تنبؤ نفاد (`stockoutRisk` يبقى `unknown`)؛
+  - فائض/راكد (`deadStock`, `excessInventory`)؛
+  - كمية إعادة طلب (`reorderQuantity`).
+  كل هذه معرّفة في الشيفرة، ومختبرة وحديًا، ومُعطّلة عند التشغيل بسبب `product_demand_not_linked` — وهذا سلوك صحيح لا نقص.
+- **الدليل 3 + 8:** `sold_quantity` تراكمي بلا نافذة. قسمته على «الأيام منذ أول مزامنة عندنا» تقيس تاريخ المزامنة لا سرعة بيع المتجر — مرفوض صراحةً.
+- **الدليل 4:** أي مقياس على مستوى المنتج يجب أن يجمع المتغيّرات أولًا؛ `inventorySummary()` في Phase 07 يعدّ **سجلات** لا منتجات، ولا يُستخدم لعدّ المنتجات النافدة.
+- **الدليل 5:** حالة «غير محدود» تُقرأ قبل الكمية. الكمية المرتفعة (`>= 50`) ملاحظة محايدة، ولا تُسمّى راكدًا ولا فائضًا.
+- **الدليل 7:** لا سجل تاريخ مخزون في هذه المرحلة، ولا هجرة قاعدة بيانات. إضافة سجل لاحقًا تحتاج نقطة قراءة موثّقة أو كتابة لقطات متكررة بقرار مالك (ADR-043).
