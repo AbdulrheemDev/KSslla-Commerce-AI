@@ -30,6 +30,7 @@ export function AppNav({
     { href: "/app/orders", label: "الطلبات" },
     { href: "/app/customers", label: "العملاء" },
     { href: "/app/inventory", label: "المخزون" },
+    { href: "/app/webhooks", label: "الويبهوك" },
   ];
 
   return (

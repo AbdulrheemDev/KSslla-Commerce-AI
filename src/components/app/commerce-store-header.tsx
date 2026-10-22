@@ -4,7 +4,8 @@ import { StatusPill } from "@/components/status-pill";
 import type { StoreView } from "@/modules/stores/application/store-service";
 
 /**
- * Shared header for `/app/orders`, `/app/customers`, `/app/inventory`.
+ * Shared header for `/app/orders`, `/app/customers`, `/app/inventory`,
+ * `/app/webhooks`.
  *
  * The store switcher lists only stores the session's organization can see, and
  * each link carries the id in the query so the page can re-verify it.
@@ -14,6 +15,7 @@ const SECTIONS = [
   { href: "/app/orders", label: "الطلبات" },
   { href: "/app/customers", label: "العملاء" },
   { href: "/app/inventory", label: "المخزون" },
+  { href: "/app/webhooks", label: "الويبهوك" },
 ] as const;
 
 export function CommerceStoreHeader({

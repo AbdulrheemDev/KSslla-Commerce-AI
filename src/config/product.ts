@@ -17,10 +17,10 @@ export const PRODUCT = {
   version: "0.1.0",
   designPartnerAr: "متجر كشخة",
   phase: {
-    number: 5,
-    label: "05",
-    titleAr: "الطلبات والعملاء وأساس المخزون",
-    titleEn: "Orders + Customers + Inventory Foundation",
+    number: 6,
+    label: "06",
+    titleAr: "الويبهوك ومحرّك المزامنة",
+    titleEn: "Webhooks + Sync Engine",
   },
 } as const;
 

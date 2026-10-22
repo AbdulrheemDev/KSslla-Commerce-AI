@@ -77,6 +77,9 @@ export interface DataSyncRuntime {
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
   createClient?: (accessToken: string) => SallaCommerceClient;
+  /** See `SyncRuntime.actorUserId`: `null` means "the system", not a person. */
+  actorUserId?: string | null;
+  trigger?: string;
 }
 
 export const defaultDataSyncRuntime: DataSyncRuntime = {
@@ -190,14 +193,17 @@ export async function runPagedSync<T>(
         storeId,
         resource: spec.resource,
         correlationId,
-        initiatedByUserId: context.userId,
+        initiatedByUserId:
+          input.runtime.actorUserId === undefined ? context.userId : input.runtime.actorUserId,
+        trigger: input.runtime.trigger,
       }),
   );
 
   const startedAt = Date.now();
   const auditBase = {
     organizationId: context.organizationId,
-    actorUserId: context.userId,
+    actorUserId:
+      input.runtime.actorUserId === undefined ? context.userId : input.runtime.actorUserId,
     entityType: "store" as const,
     entityId: storeId,
     ipHash: meta.ipHash,

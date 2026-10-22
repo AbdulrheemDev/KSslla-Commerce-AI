@@ -97,6 +97,17 @@ export interface SyncRuntime {
   sleep: (ms: number) => Promise<void>;
   createCatalogClient?: (accessToken: string) => SallaCatalogClient;
   pageSize?: number;
+  /**
+   * Actor recorded on the run and the audit entry.
+   *
+   * Manual syncs leave it undefined and the signed-in user is used. Background
+   * work (webhook worker) passes `null`, because the system acted, not a person
+   * — a synthetic user id would violate the `initiated_by_user_id` foreign key
+   * and would misattribute the run.
+   */
+  actorUserId?: string | null;
+  /** `manual` | `webhook` | `scheduler`; stored on `sync_runs.trigger`. */
+  trigger?: string;
 }
 
 const defaultRuntime: SyncRuntime = {
@@ -248,14 +259,15 @@ async function runOneResource(
         storeId,
         resource,
         correlationId,
-        initiatedByUserId: context.userId,
+        initiatedByUserId: runtime.actorUserId === undefined ? context.userId : runtime.actorUserId,
+        trigger: runtime.trigger,
       }),
   );
 
   const startedAt = Date.now();
   const auditBase = {
     organizationId: context.organizationId,
-    actorUserId: context.userId,
+    actorUserId: runtime.actorUserId === undefined ? context.userId : runtime.actorUserId,
     entityType: "store" as const,
     entityId: storeId,
     ipHash: meta.ipHash,
