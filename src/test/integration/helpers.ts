@@ -392,6 +392,30 @@ async function loadHandler(
     return { dispatch };
   }
 
+  const productIntelligence = normalized.match(
+    /^\/api\/organizations\/current\/stores\/([^/]+)\/product-intelligence\/(overview|products|categories|issues|recommendations)$/,
+  );
+  if (productIntelligence) {
+    const endpoint = productIntelligence[2]!;
+    const loaders: Record<string, () => Promise<Record<string, unknown>>> = {
+      overview: () =>
+        import("@/app/api/organizations/current/stores/[storeId]/product-intelligence/overview/route"),
+      products: () =>
+        import("@/app/api/organizations/current/stores/[storeId]/product-intelligence/products/route"),
+      categories: () =>
+        import("@/app/api/organizations/current/stores/[storeId]/product-intelligence/categories/route"),
+      issues: () =>
+        import("@/app/api/organizations/current/stores/[storeId]/product-intelligence/issues/route"),
+      recommendations: () =>
+        import("@/app/api/organizations/current/stores/[storeId]/product-intelligence/recommendations/route"),
+    };
+
+    const handlers = (await loaders[endpoint]!()) as Record<string, unknown>;
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
   const store = normalized.match(/^\/api\/organizations\/current\/stores\/([^/]+)$/);
   if (store) {
     const handlers =

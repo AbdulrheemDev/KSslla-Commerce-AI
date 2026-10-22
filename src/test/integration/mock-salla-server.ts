@@ -25,6 +25,7 @@ export interface MockProduct {
   type?: string;
   status: string;
   description?: string;
+  url?: string;
   price?: { amount: number | string; currency: string };
   regular_price?: { amount: number | string; currency: string };
   sale_price?: Record<string, never>;
@@ -33,6 +34,7 @@ export interface MockProduct {
   updated_at?: string;
   categories?: Array<{ id: number | string }>;
   main_image?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface MockCategory {
