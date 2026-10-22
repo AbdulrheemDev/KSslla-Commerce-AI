@@ -151,6 +151,19 @@ export default async function StoreSettingsPage({
         </div>
       </section>
 
+      <Link
+        href={`/app/stores/${store.id}/intelligence`}
+        className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal/25 bg-teal/5 px-5 py-4 transition hover:border-teal/50"
+      >
+        <span>
+          <span className="block text-sm font-semibold text-ink">ذكاء المتجر</span>
+          <span className="mt-1 block text-[11.5px] leading-6 text-muted">
+            مؤشرات وتحليلات وفرص محسوبة من البيانات المحفوظة — مع توضيح ما لا تتوفر بياناته.
+          </span>
+        </span>
+        <span className="text-[11.5px] font-medium text-teal">فتح التحليل ←</span>
+      </Link>
+
       <SimulatorNotice />
 
       <SallaConnectionCard

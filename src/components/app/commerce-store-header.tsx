@@ -83,8 +83,14 @@ export function CommerceStoreHeader({
         ) : null}
 
         <Link
+          href={`/app/stores/${store.id}/intelligence`}
+          className="ms-auto rounded-lg bg-teal/10 px-2.5 py-1 text-[11.5px] font-medium text-teal hover:bg-teal/15"
+        >
+          ذكاء المتجر
+        </Link>
+        <Link
           href={`/app/stores/${store.id}`}
-          className="ms-auto text-[11.5px] text-muted underline underline-offset-4 hover:text-ink"
+          className="text-[11.5px] text-muted underline underline-offset-4 hover:text-ink"
         >
           إعدادات المتجر
         </Link>
