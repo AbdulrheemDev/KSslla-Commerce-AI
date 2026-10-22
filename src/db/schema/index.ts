@@ -12,3 +12,4 @@ export * from "@/db/schema/catalog";
 export * from "@/db/schema/sync";
 export * from "@/db/schema/commerce";
 export * from "@/db/schema/inventory";
+export * from "@/db/schema/webhooks";

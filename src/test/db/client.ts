@@ -29,8 +29,8 @@ export async function resetDatabase(): Promise<void> {
 
   try {
     await admin.unsafe(
-      `truncate table "audit_logs", "invitations", "stores", "organization_members",
-         "sessions", "organizations", "users" restart identity cascade`,
+      `truncate table "webhook_events", "audit_logs", "invitations", "stores",
+         "organization_members", "sessions", "organizations", "users" restart identity cascade`,
     );
   } finally {
     await admin.end({ timeout: 5 });

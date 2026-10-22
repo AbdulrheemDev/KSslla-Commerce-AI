@@ -37,6 +37,15 @@ export const AUDIT_ACTIONS = [
   "salla.inventory.sync_started",
   "salla.inventory.sync_completed",
   "salla.inventory.sync_failed",
+  "webhook.received",
+  "webhook.unmatched",
+  "webhook.processed",
+  "webhook.failed",
+  "webhook.dead_letter",
+  "webhook.replayed",
+  "salla.app.authorized",
+  "salla.app.updated",
+  "salla.app.uninstalled",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

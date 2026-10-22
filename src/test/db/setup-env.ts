@@ -12,3 +12,6 @@ process.env.LOG_LEVEL = "silent";
 // Test-only encryption key. Tokens stored during tests are therefore decryptable
 // only with this key and never with a production secret.
 process.env.ENCRYPTION_KEY = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+// Simulator-only webhook signing secret. Real deployments set their own; the
+// value never leaves the test process.
+process.env.SALLA_WEBHOOK_SECRET = "integration-test-webhook-secret-value";

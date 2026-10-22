@@ -50,6 +50,15 @@ export const serverEnvSchema = z.object({
 
   // Phase 06 — Salla webhooks
   SALLA_WEBHOOK_SECRET: optionalText,
+  /**
+   * Bearer token for the internal worker drain endpoint, which pumps retries
+   * between deliveries. Unset disables the endpoint entirely (404).
+   */
+  WEBHOOK_WORKER_TOKEN: z
+    .string()
+    .trim()
+    .min(16, "WEBHOOK_WORKER_TOKEN must be at least 16 characters.")
+    .optional(),
 
   // Phase 14 — AI provider
   AI_PROVIDER: optionalText,
