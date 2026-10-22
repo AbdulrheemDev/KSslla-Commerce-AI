@@ -48,6 +48,26 @@ export const REASON_LABELS_AR: Record<string, string> = {
   history_starts_after_window: "سجل الطلبات يبدأ بعد بداية الفترة",
   some_products_missing_sales_data: "بعض المنتجات بلا بيانات مبيعات",
 
+  // Phase 09 — product intelligence.
+  catalog_not_synced: "الكتالوج لم يُزامَن بعد",
+  products_not_synced: "المنتجات لم تُزامَن بعد",
+  no_products_stored: "لا توجد منتجات محفوظة",
+  categories_not_synced: "التصنيفات لم تُزامَن بعد",
+  products_sync_incomplete: "آخر مزامنة للمنتجات لم تكتمل",
+  categories_sync_incomplete: "آخر مزامنة للتصنيفات لم تكتمل",
+  products_skipped_in_last_run: "تخطّت آخر مزامنة بعض المنتجات",
+  categories_skipped_in_last_run: "تخطّت آخر مزامنة بعض التصنيفات",
+  provider_updated_at_missing: "تاريخ تحديث المنتج غير موجود",
+  updated_at_missing_for_some_products: "تاريخ تحديث بعض المنتجات غير موجود",
+  stock_known_for_some_products: "المخزون معروف لبعض المنتجات فقط",
+  metadata_not_captured: "البيانات الوصفية لم تُحفظ لكل المنتجات",
+  images_not_mirrored: "قائمة صور المنتج غير محفوظة في النسخة المحلية",
+  image_alt_not_mirrored: "نص alt للصورة غير محفوظ في النسخة المحلية",
+  created_at_not_documented: "Salla لا توثّق تاريخ إنشاء المنتج",
+  product_sales_not_linked: "بنود الطلب لا تحمل معرّف منتج، فلا تُنسب مبيعات لمنتج",
+  no_products_in_category: "لا توجد منتجات في هذا التصنيف",
+  missing_currency: "لا توجد عملة محفوظة",
+
   // Phase 08 — sales intelligence.
   outside_history: "خارج السجل المحفوظ",
   history_starts_mid_bucket: "بداية السجل داخل هذه الفترة",

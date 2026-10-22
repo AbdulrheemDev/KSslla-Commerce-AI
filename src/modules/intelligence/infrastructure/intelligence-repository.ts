@@ -199,12 +199,16 @@ export async function loadCustomerRows(tx: Transaction, storeId: string): Promis
   }));
 }
 
+/**
+ * Categories of one store. `status` is selected because Phase 09 reads the
+ * documented `hidden` value; Phase 07 simply ignores the extra field.
+ */
 export async function loadCategoryRows(
   tx: Transaction,
   storeId: string,
-): Promise<Array<{ id: string; name: string }>> {
+): Promise<Array<{ id: string; name: string; status: string }>> {
   return tx
-    .select({ id: categories.id, name: categories.name })
+    .select({ id: categories.id, name: categories.name, status: categories.status })
     .from(categories)
     .where(eq(categories.storeId, storeId));
 }
