@@ -7,7 +7,6 @@ import { recordAudit } from "@/modules/audit/infrastructure/audit-repository";
 import {
   SALLA_SECURITY_STRATEGY_HEADER,
   SALLA_SIGNATURE_HEADER,
-  SALLA_WEBHOOK_VERSION_HEADER,
   verifySallaWebhookSignature,
 } from "@/modules/webhooks/domain/signature";
 import {
@@ -109,8 +108,12 @@ export async function ingestSallaWebhook(db: Database, input: IngestInput): Prom
   const payloadHash = hashRawBody(input.rawBody);
   const eventName = envelope.data.event;
   const externalStoreId = envelope.data.merchant;
-  const versionHeader = input.headers.get(SALLA_WEBHOOK_VERSION_HEADER);
-  const eventVersion = versionHeader && /^\d+$/.test(versionHeader) ? Number(versionHeader) : null;
+  // The webhook version is a **registration** parameter, not a delivery header:
+  // the documented payload carries only `event`, `merchant`, `created_at`, and
+  // `data` (docs/salla-reference.md §14.3). Reading a version from an
+  // undocumented header would have meant storing an invented value, so this
+  // column stays empty until Salla documents a delivery-time source for it.
+  const eventVersion: number | null = null;
 
   const action = classifyEvent(eventName);
   const resolved = await resolveStoreByExternalId(db, externalStoreId);

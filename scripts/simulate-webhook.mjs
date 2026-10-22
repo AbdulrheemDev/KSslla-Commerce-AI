@@ -69,8 +69,9 @@ function sign(body) {
 async function post(body, signed) {
   const headers = {
     "content-type": "application/json",
+    // Only the two documented delivery headers; the version is a registration
+    // parameter and is never sent (docs/salla-reference.md §14.8.7).
     "x-salla-security-strategy": "Signature",
-    "x-salla-webhook-version": "2",
   };
 
   if (signed) headers["x-salla-signature"] = sign(body);

@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   classifyEvent,
+  classifyLifecycle,
+  eventRegistry,
+  findEventDefinition,
+  isCurrentEvent,
   isKnownEvent,
+  registeredEventNames,
   WEBHOOK_SYNC_RESOURCES,
 } from "@/modules/webhooks/domain/events";
 
@@ -55,10 +60,17 @@ describe("classifyEvent — product events", () => {
   });
 
   it("still handles the deprecated names, because Salla may still deliver them", () => {
-    // docs: product.updated and product.available are marked deprecated; a
-    // merchant that registered a webhook earlier still receives them.
+    // The official table strikes these two through ("~~…~~"). They stay routed,
+    // because a webhook registered before the deprecation still delivers them,
+    // but they are labelled deprecated and never reported as current.
     expect(classifyEvent("product.updated")).toEqual({ kind: "sync", resource: "products" });
     expect(classifyEvent("product.available")).toEqual({ kind: "sync", resource: "products" });
+
+    for (const eventName of ["product.updated", "product.available"]) {
+      expect(classifyLifecycle(eventName)).toBe("deprecated");
+      expect(isCurrentEvent(eventName)).toBe(false);
+      expect(findEventDefinition(eventName)?.deprecationNote).toBeTruthy();
+    }
   });
 
   it("refreshes inventory as well as products for a low-quantity notice", () => {
@@ -130,33 +142,99 @@ describe("classifyEvent — app lifecycle", () => {
   });
 });
 
-describe("classifyEvent — unknown and out-of-scope events", () => {
-  it("ignores documented families this phase does not consume", () => {
-    for (const eventName of [
-      "shipping.company.created",
-      "brand.updated",
-      "cart.updated",
-      "invoice.created",
-      "store.branch.updated",
-    ]) {
-      expect(classifyEvent(eventName)).toEqual({ kind: "ignore", reason: "unsupported_event" });
-      expect(isKnownEvent(eventName)).toBe(false);
-    }
+describe("classifyEvent — documented but not consumed", () => {
+  /**
+   * Real names from the official store-event tables (Shipping Companies,
+   * Shipments, Brand, Store, Cart, Invoice, Special Offer, Miscellaneous).
+   * Recognised so the record says "documented, not consumed" rather than
+   * implying we do not know the event.
+   */
+  it.each([
+    "shipping.zone.created",
+    "shipping.zone.updated",
+    "shipping.company.created",
+    "shipping.company.updated",
+    "shipping.company.deleted",
+    "shipment.creating",
+    "shipment.created",
+    "shipment.cancelled",
+    "shipment.updated",
+    "brand.created",
+    "brand.updated",
+    "brand.deleted",
+    "store.branch.created",
+    "store.branch.updated",
+    "store.branch.setDefault",
+    "store.branch.activated",
+    "store.branch.deleted",
+    "storetax.created",
+    "abandoned.cart",
+    "coupon.applied",
+    "invoice.created",
+    "specialoffer.created",
+    "specialoffer.updated",
+    "review.added",
+  ])("acknowledges %s without acting on it", (eventName) => {
+    expect(classifyEvent(eventName)).toEqual({
+      kind: "ignore",
+      reason: "documented_not_consumed",
+    });
+    expect(classifyLifecycle(eventName)).toBe("documented_not_consumed");
+    expect(isKnownEvent(eventName)).toBe(true);
+    expect(isCurrentEvent(eventName)).toBe(false);
   });
+});
 
+describe("classifyEvent — unknown events", () => {
   it("ignores a name it has never seen instead of throwing", () => {
     expect(classifyEvent("future.event.name")).toEqual({
       kind: "ignore",
-      reason: "unsupported_event",
+      reason: "unknown_event",
     });
+    expect(classifyLifecycle("future.event.name")).toBe("unknown");
+    expect(isKnownEvent("future.event.name")).toBe(false);
   });
 
-  it("is not fooled by prefix lookalikes", () => {
-    expect(classifyEvent("order.created.extra")).toEqual({
-      kind: "ignore",
-      reason: "unsupported_event",
-    });
-    expect(classifyEvent("product")).toEqual({ kind: "ignore", reason: "unsupported_event" });
+  it("is not fooled by prefix lookalikes or invented names", () => {
+    for (const eventName of ["order.created.extra", "product", "order.created ", "Order.created"]) {
+      expect(classifyEvent(eventName)).toEqual({ kind: "ignore", reason: "unknown_event" });
+    }
+  });
+});
+
+describe("event registry — coverage of the official tables", () => {
+  it("holds exactly the documented store and app events", () => {
+    // Order 17 · Product 11 · Category 2 · Customer 4 · App 13 = 47
+    expect(eventRegistry()).toHaveLength(47);
+    expect(new Set(registeredEventNames()).size).toBe(47);
+  });
+
+  it("counts each documented family exactly once", () => {
+    const counts = eventRegistry().reduce<Record<string, number>>((accumulator, entry) => {
+      accumulator[entry.family] = (accumulator[entry.family] ?? 0) + 1;
+      return accumulator;
+    }, {});
+
+    expect(counts).toEqual({ order: 17, product: 11, category: 2, customer: 4, app: 13 });
+  });
+
+  it("marks only the two struck-through product events as deprecated", () => {
+    const deprecated = eventRegistry()
+      .filter((entry) => entry.lifecycle === "deprecated")
+      .map((entry) => entry.name)
+      .sort();
+
+    expect(deprecated).toEqual(["product.available", "product.updated"]);
+  });
+
+  it("keeps every sync target inside the sync engine's resource list", () => {
+    for (const entry of eventRegistry()) {
+      if (entry.action.kind !== "sync") continue;
+      expect(WEBHOOK_SYNC_RESOURCES).toContain(entry.action.resource);
+      for (const extra of entry.action.also ?? []) {
+        expect(WEBHOOK_SYNC_RESOURCES).toContain(extra);
+      }
+    }
   });
 });
 

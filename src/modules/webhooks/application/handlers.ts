@@ -3,7 +3,7 @@ import { AppError } from "@/lib/errors";
 import { withTenantTransaction } from "@/db/tenant";
 import type { WebhookEvent } from "@/db/schema";
 import { recordAudit } from "@/modules/audit/infrastructure/audit-repository";
-import { classifyEvent } from "@/modules/webhooks/domain/events";
+import { classifyEvent, findEventDefinition } from "@/modules/webhooks/domain/events";
 import {
   disconnectConnection,
   findConnectionByStore,
@@ -36,6 +36,9 @@ export interface HandlerOutcome {
 export async function handleWebhookEvent(context: HandlerContext): Promise<HandlerOutcome> {
   const { db, event, organizationId, storeId } = context;
   const decision = classifyEvent(event.eventName);
+  // Kept next to the outcome so a deprecated event is visibly deprecated in the
+  // audit trail instead of passing for a current one (ADR-052).
+  const definition = findEventDefinition(event.eventName);
 
   switch (decision.kind) {
     case "sync": {
@@ -76,7 +79,14 @@ export async function handleWebhookEvent(context: HandlerContext): Promise<Handl
         });
       }
 
-      return { action: "synced", detail: { resources: performed } };
+      return {
+        action: "synced",
+        detail: {
+          resources: performed,
+          lifecycle: definition?.lifecycle ?? "unknown",
+          ...(definition?.deprecationNote ? { deprecationNote: definition.deprecationNote } : {}),
+        },
+      };
     }
 
     case "revoke_connection": {
@@ -165,7 +175,7 @@ export async function handleWebhookEvent(context: HandlerContext): Promise<Handl
     default:
       return {
         action: "ignored",
-        detail: { reason: decision.kind === "ignore" ? decision.reason : "unsupported_event" },
+        detail: { reason: decision.kind === "ignore" ? decision.reason : "unknown_event" },
       };
   }
 }

@@ -41,7 +41,11 @@ export const webhookEvents = pgTable(
 
     provider: text("provider").notNull().default("salla"),
     eventName: text("event_name").notNull(),
-    /** Provider webhook version (`1` or `2`); null when the delivery omits it. */
+    /**
+     * Provider webhook version (`1` or `2`). It is chosen when a webhook is
+     * registered and is **not** part of the documented delivery payload, so it
+     * stays null; the column exists for the day Salla exposes it per delivery.
+     */
     eventVersion: integer("event_version"),
     /**
      * Reserved: no Salla event id is documented today. Kept so a future

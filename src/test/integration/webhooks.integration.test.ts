@@ -122,16 +122,19 @@ interface DeliveryOptions {
   secret?: string;
   contentType?: string;
   headers?: Record<string, string>;
+  query?: string;
 }
 
 async function deliver(
   rawBody: string,
   options: DeliveryOptions = {},
 ): Promise<{ status: number; body: Record<string, unknown> }> {
+  // Only the two documented headers are sent. `x-salla-webhook-version` is a
+  // registration parameter, not a delivery header, so the tests must not rely
+  // on it either (docs/salla-reference.md §14.3).
   const headers = new Headers({
     host: "localhost:3000",
     "content-type": options.contentType ?? "application/json",
-    "x-salla-webhook-version": "2",
     ...(options.headers ?? {}),
   });
 
@@ -146,7 +149,7 @@ async function deliver(
   if (strategy !== null) headers.set("x-salla-security-strategy", strategy);
 
   const { POST } = await import("@/app/api/webhooks/salla/route");
-  const request = new NextRequest(`${BASE_URL}/api/webhooks/salla`, {
+  const request = new NextRequest(`${BASE_URL}/api/webhooks/salla${options.query ?? ""}`, {
     method: "POST",
     headers,
     body: rawBody,
@@ -277,6 +280,76 @@ describe("public endpoint — verification before anything else", () => {
     expect(await rawEvents()).toHaveLength(0);
   });
 
+  it("rejects any unsupported strategy even when the digest is correct", async () => {
+    // A valid HMAC only proves "whoever sent this knows the secret". Under a
+    // strategy we do not implement, it does not prove the request is the kind
+    // of request we think it is, so the strategy header is authoritative.
+    await connectStore(await ownerWithStore("webhook-strategy@example.test"));
+
+    for (const strategy of ["Token", "HMAC", "None", "Signature,Token"]) {
+      const response = await deliver(body("order.created", { id: 700001 }), { strategy });
+      expect(response.status).toBe(401);
+      expect(response.body).toEqual({
+        error: { code: "WEBHOOK_UNAUTHORIZED", message: "Unauthorized webhook." },
+      });
+    }
+
+    expect(await rawEvents()).toHaveLength(0);
+  });
+
+  it("treats an absent strategy header as Salla's documented Signature default", async () => {
+    // Salla assigns `Signature` when a webhook is registered without a strategy.
+    // Absence therefore means the default — and the digest is still mandatory.
+    const owner = await connectStore(await ownerWithStore("webhook-default@example.test"));
+
+    const accepted = await deliver(body("product.created", { id: 1001 }), { strategy: null });
+    expect(accepted.status).toBe(200);
+
+    const [event] = await selectEvents(owner.organizationId);
+    expect(event?.signatureStrategy).toBe("Signature");
+
+    const rejected = await deliver(body("product.created", { id: 1002 }), {
+      strategy: null,
+      secret: "wrong-secret",
+    });
+    expect(rejected.status).toBe(401);
+    expect(await rawEvents()).toHaveLength(1);
+  });
+
+  it("rejects a well-formed-looking but non-hex signature", async () => {
+    await connectStore(await ownerWithStore("webhook-nonhex@example.test"));
+
+    for (const signature of ["Z".repeat(64), "abc", `${"a".repeat(64)}00`]) {
+      const response = await deliver(body("order.created"), { signature });
+      expect(response.status).toBe(401);
+    }
+
+    expect(await rawEvents()).toHaveLength(0);
+  });
+
+  it("signs the raw bytes: whitespace-only JSON changes invalidate the delivery", async () => {
+    await connectStore(await ownerWithStore("webhook-rawbody@example.test"));
+
+    const raw = body("product.created", { id: 1001 });
+    const signature = signSallaWebhookBody(raw, WEBHOOK_SECRET);
+
+    // Same JSON value, different bytes → the digest no longer matches.
+    const pretty = JSON.stringify(JSON.parse(raw), null, 2);
+    const reordered = JSON.stringify({
+      data: { id: 1001 },
+      created_at: "2026-10-22 10:00:00",
+      merchant: Number(MERCHANT),
+      event: "product.created",
+    });
+
+    for (const variant of [pretty, `${raw}\n`, reordered]) {
+      const response = await deliver(variant, { signature });
+      expect(response.status).toBe(401);
+    }
+
+    expect(await rawEvents()).toHaveLength(0);
+  });
+
   it("verifies before parsing: a malformed body with a bad signature is still a 401", async () => {
     await connectStore(await ownerWithStore("webhook-malformed@example.test"));
 
@@ -358,6 +431,48 @@ describe("ingestion — tenant resolution and idempotency", () => {
     // The forged ids are not part of the projection, so they were never stored.
     expect(JSON.stringify(event?.payload)).not.toContain("organization_id");
     expect(JSON.stringify(event?.payload)).not.toContain("store_id");
+  });
+
+  it("cannot be steered to another organization by forged body or query identifiers", async () => {
+    const ownerA = await connectStore(await ownerWithStore("webhook-tenant-a@example.test"));
+    const ownerB = await ownerWithStore("webhook-tenant-b@example.test");
+
+    const forged = JSON.stringify({
+      event: "order.created",
+      merchant: Number(MERCHANT),
+      created_at: "2026-10-22 10:00:00",
+      data: {
+        id: 500002,
+        organization_id: ownerB.organizationId,
+        organizationId: ownerB.organizationId,
+        store_id: ownerB.storeId,
+        storeId: ownerB.storeId,
+        user_id: ownerB.userId,
+      },
+    });
+
+    const query = new URLSearchParams({
+      organization_id: ownerB.organizationId,
+      store_id: ownerB.storeId,
+      user_id: ownerB.userId,
+    }).toString();
+
+    const response = await deliver(forged, { query: `?${query}` });
+    expect(response.status).toBe(200);
+
+    // The verified merchant resolves to Org A's binding; nothing in the request
+    // can redirect that (ADR-046).
+    const eventsA = await selectEvents(ownerA.organizationId);
+    expect(eventsA).toHaveLength(1);
+    expect(eventsA[0]?.organizationId).toBe(ownerA.organizationId);
+    expect(eventsA[0]?.storeId).toBe(ownerA.storeId);
+
+    // Org B sees nothing, and none of its identifiers were stored anywhere.
+    expect(await selectEvents(ownerB.organizationId)).toHaveLength(0);
+    const serialised = JSON.stringify(eventsA[0]?.payload);
+    expect(serialised).not.toContain(ownerB.organizationId);
+    expect(serialised).not.toContain(ownerB.storeId);
+    expect(serialised).not.toContain(ownerB.userId);
   });
 
   it("stores an unresolvable merchant as unmatched and invisible to every tenant", async () => {
@@ -516,7 +631,7 @@ describe("worker — processing, retry, and dead letter", () => {
 
     const [event] = await selectEvents(owner.organizationId);
     expect(event?.status).toBe("ignored");
-    expect(event?.result).toMatchObject({ reason: "unsupported_event" });
+    expect(event?.result).toMatchObject({ reason: "unknown_event" });
     expect(mock.requests).toHaveLength(0);
   });
 

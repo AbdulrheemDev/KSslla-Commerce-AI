@@ -3,29 +3,55 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 /**
  * Salla webhook signature verification.
  *
- * Documented scheme (docs/salla-reference.md §14.2):
- * - header `X-Salla-Security-Strategy` carries the strategy name (`Signature`);
- * - header `X-Salla-Signature` carries a hex HMAC-SHA256 of the request body
- *   keyed by the webhook secret.
+ * **Verified against the official docs on 2026-10-22**
+ * (https://docs.salla.dev/webhooks · https://docs.salla.dev/421119m0 §Security
+ * Strategies / Verify Webhooks Using Signature):
  *
- * The **raw** body is hashed, never a re-serialised `JSON.parse` result. The
- * documentation's Node sample re-serialises `req.body`, while its PHP sample
- * reads `php://input`; only the raw body is stable across key order, whitespace,
- * and unicode escaping, so this module hashes what arrived (ADR-045).
+ * - the delivery carries exactly two security headers —
+ *   `X-Salla-Security-Strategy: Signature` and `X-Salla-Signature`;
+ * - the signature is the request body's **64-character SHA256 hex** produced
+ *   with the per-webhook `secret`;
+ * - the docs' Node sample is
+ *   `crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('hex')`
+ *   and the PHP sample is `hash_hmac('sha256', file_get_contents('php://input'), $secret)`.
+ *
+ * Both samples are HMAC-SHA256 keyed by the secret — **not** an unkeyed hash of
+ * the body. This module implements the keyed algorithm and hashes the bytes that
+ * actually arrived. The Node sample re-serialises a parsed object; doing the
+ * same would tie validity to key order and whitespace, so the raw body is used
+ * instead (ADR-045, restated in docs/salla-reference.md §14.10).
+ *
+ * The signature is never logged, never stored, and never returned to a caller —
+ * only the outcome and its reason leave this module.
  */
 
 export const SALLA_SIGNATURE_HEADER = "x-salla-signature";
 export const SALLA_SECURITY_STRATEGY_HEADER = "x-salla-security-strategy";
-export const SALLA_WEBHOOK_VERSION_HEADER = "x-salla-webhook-version";
 
-/** The only strategy this implementation verifies. */
+/**
+ * The only strategy this implementation verifies.
+ *
+ * Salla documents `Signature` (the default for every registered webhook) and
+ * `Token`. Only `Signature` is specified in enough detail to verify a request,
+ * so `Token` is refused rather than guessed (ADR-045).
+ */
 export const SUPPORTED_STRATEGY = "signature";
 
+/** Canonical casing Salla documents, stored in `webhook_events.signature_strategy`. */
+export const SIGNATURE_STRATEGY_NAME = "Signature";
+
+/** SHA256 hex: exactly 64 lowercase hex characters after normalisation. */
+export const SIGNATURE_HEX_PATTERN = /^[0-9a-f]{64}$/;
+
 export type SignatureFailure =
-  "secret_not_configured" | "missing_signature" | "unsupported_strategy" | "invalid_signature";
+  | "secret_not_configured"
+  | "missing_signature"
+  | "malformed_signature"
+  | "unsupported_strategy"
+  | "invalid_signature";
 
 export type SignatureResult =
-  | { ok: true; strategy: string; strategyHeaderPresent: boolean }
+  | { ok: true; strategy: typeof SIGNATURE_STRATEGY_NAME; strategyHeaderPresent: boolean }
   | { ok: false; reason: SignatureFailure };
 
 /** Hex HMAC-SHA256 of the raw body. Exported for the local simulator and tests. */
@@ -50,8 +76,8 @@ export function safeEqualString(expected: string, received: string): boolean {
 /**
  * Constant-time comparison of two hex digests.
  *
- * `timingSafeEqual` needs equal-length buffers, so the length check happens
- * first and returns `false` without comparing content.
+ * Kept as a named helper because the digest comparison is the security-critical
+ * call site: a plain `===` there would leak how many leading characters matched.
  */
 export function safeEqualHex(expected: string, received: string): boolean {
   return safeEqualString(expected, received);
@@ -60,12 +86,21 @@ export function safeEqualHex(expected: string, received: string): boolean {
 /**
  * Verifies a delivery.
  *
- * A missing strategy header is accepted when the signature verifies: Salla
- * documents `Signature` as the default strategy for apps, and rejecting on an
- * absent header would break a documented default. A header naming any other
- * strategy (`Token`) is rejected — this build implements the documented
- * signature strategy only, and silently accepting a token delivery would mean
- * accepting an unverified body.
+ * Decision order is deliberate:
+ *
+ * 1. no configured secret → refuse everything (never "accept unverified");
+ * 2. no signature header → nothing to verify;
+ * 3. a strategy header naming anything but `Signature` → refuse, even if a
+ *    valid signature happens to accompany it. An unsupported strategy means we
+ *    do not know what the header is proving;
+ * 4. a signature that is not 64 hex characters → malformed, refused before any
+ *    comparison;
+ * 5. otherwise compare the HMAC in constant time.
+ *
+ * A **missing** strategy header is accepted when the digest verifies: Salla
+ * documents `Signature` as the strategy it assigns by default, so absence means
+ * the default rather than "unauthenticated". This is not a bypass — step 5 is
+ * still mandatory, and a missing header with a wrong signature is rejected.
  */
 export function verifySallaWebhookSignature(input: {
   rawBody: string;
@@ -80,7 +115,8 @@ export function verifySallaWebhookSignature(input: {
     return { ok: false, reason: "secret_not_configured" };
   }
 
-  if (!signature || signature.trim().length === 0) {
+  const received = signature?.trim().toLowerCase() ?? "";
+  if (received.length === 0) {
     return { ok: false, reason: "missing_signature" };
   }
 
@@ -88,8 +124,11 @@ export function verifySallaWebhookSignature(input: {
     return { ok: false, reason: "unsupported_strategy" };
   }
 
+  if (!SIGNATURE_HEX_PATTERN.test(received)) {
+    return { ok: false, reason: "malformed_signature" };
+  }
+
   const expected = signSallaWebhookBody(rawBody, secret);
-  const received = signature.trim().toLowerCase();
 
   if (!safeEqualHex(expected, received)) {
     return { ok: false, reason: "invalid_signature" };
@@ -97,7 +136,7 @@ export function verifySallaWebhookSignature(input: {
 
   return {
     ok: true,
-    strategy: strategyHeaderPresent ? strategy.trim() : SUPPORTED_STRATEGY,
+    strategy: SIGNATURE_STRATEGY_NAME,
     strategyHeaderPresent,
   };
 }
