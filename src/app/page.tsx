@@ -6,7 +6,7 @@ import {
   CURRENT_CAPABILITIES,
   DATA_STATE,
   DOCUMENTS,
-  PHASE_03_SCOPE,
+  PHASE_04_SCOPE,
   PLANNED_MODULES,
   PRINCIPLES,
   PRODUCT,
@@ -17,6 +17,8 @@ const COMPLETED_ARTIFACTS = [
   "تسجيل ودخول وخروج بجلسات قابلة للإبطال",
   "مؤسسات وأدوار ودعوات مع مصفوفة صلاحيات",
   "عزل بيانات مثبت باختبارات RLS على قاعدة حقيقية",
+  "ربط متجر Salla للقراءة فقط مع تشفير الرموز",
+  "مزامنة منتجات وتصنيفات idempotent بقفل لكل متجر",
 ] as const;
 
 const HERO_CHIPS = [
@@ -84,9 +86,9 @@ export default function HomePage() {
         <section className="grid gap-10 pt-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-start lg:pt-14">
           <div>
             <div className="mb-6 flex flex-wrap items-center gap-2">
-              <StatusPill tone="teal">المصادقة وتعدد المستأجرين</StatusPill>
+              <StatusPill tone="teal">كتالوج Salla للقراءة فقط</StatusPill>
               <StatusPill tone="muted">
-                <span className="ltr">Authentication &amp; Multi-Tenancy</span>
+                <span className="ltr">Read-only Salla Catalog</span>
               </StatusPill>
             </div>
 
@@ -111,8 +113,8 @@ export default function HomePage() {
 
             <p className="mt-7 max-w-xl rounded-xl border border-line bg-surface/50 p-4 text-[12.5px] leading-6 text-muted">
               <span className="font-semibold text-ink">نطاق هذه المرحلة:</span> هوية ومؤسسات وأدوار
-              وعزل بيانات فقط — لا اتصال بـ <span className="ltr">Salla</span>، ولا بيانات متجر، ولا
-              تنفيذ أي إجراء.
+              وعزل بيانات، وربط متجر <span className="ltr">Salla</span> للقراءة فقط، ومزامنة منتجاته
+              وتصنيفاته. لا كتابة على المتجر، ولا طلبات أو عملاء أو مخزون، ولا تنفيذ أي إجراء.
             </p>
           </div>
 
@@ -147,18 +149,18 @@ export default function HomePage() {
             <div className="mt-6 rounded-2xl border border-gold/20 bg-gold/[0.06] p-4">
               <p className="flex items-center gap-2 text-xs font-semibold text-gold-soft">
                 <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-gold" />
-                لا اتصال بمتجر في هذه المرحلة
+                قراءة فقط من Salla — بلا كتابة
               </p>
               <p className="mt-2 text-[12px] leading-6 text-muted">
-                لا تُقرأ بيانات من <span className="ltr">Salla</span> ولا تُكتب، ولا يوجد مزوّد ذكاء
-                اصطناعي مهيأ. هذه الواجهة تعرض حالة المشروع فقط.
+                تُقرأ المنتجات والتصنيفات من <span className="ltr">Salla</span> بعد ربط المتجر
+                وموافقتك، ولا تُكتب أي بيانات هناك. لا يوجد مزوّد ذكاء اصطناعي مهيأ بعد.
               </p>
             </div>
 
             <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-line/70 bg-canvas/40 px-3.5 py-3">
               <span className="text-[11px] text-muted">المرحلة التالية</span>
               <span className="text-[12px] font-medium text-ink">
-                <span className="ltr text-gold">Phase 03</span> · ربط متجر Salla
+                <span className="ltr text-gold">Phase 05</span> · الطلبات والعملاء والمخزون
               </span>
             </div>
           </aside>
@@ -252,8 +254,8 @@ export default function HomePage() {
                 ))}
               </ul>
               <p className="mt-4 text-[11px] leading-6 text-muted/80">
-                هذه الحالة مقصودة في المرحلة 01. أي ظهور لبيانات متجر قبل ربط{" "}
-                <span className="ltr">Salla</span> بشكل موثّق يُعدّ خللًا.
+                كل رقم في التطبيق يأتي من قاعدة البيانات بعد مزامنة صريحة. أي بيانات متجر بلا اتصال
+                موثّق أو بلا مزامنة يُعدّ خللًا.
               </p>
             </div>
           </div>
@@ -263,21 +265,21 @@ export default function HomePage() {
           <SectionHeading
             id="next-heading"
             index="04"
-            title="المرحلة التالية"
-            description="لا يبدأ التنفيذ قبل اعتماد هذه المرحلة. النطاق أدناه هو الحد الأدنى القابل للاختبار."
+            title="المرحلة الحالية"
+            description="المرحلة المنفَّذة الآن وبانتظار مراجعة المالك. النطاق أدناه هو الحد الأدنى القابل للاختبار."
           />
 
           <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
             <div className="rounded-3xl border border-gold/20 bg-gradient-to-br from-gold/[0.07] via-surface/60 to-transparent p-6">
               <div className="flex items-center justify-between gap-3">
                 <span className="ltr text-[11px] font-semibold tracking-[0.2em] text-gold">
-                  Phase 03
+                  Phase 04
                 </span>
-                <StatusPill tone="gold">التالي</StatusPill>
+                <StatusPill tone="gold">للمراجعة</StatusPill>
               </div>
-              <h3 className="mt-3 text-xl font-semibold text-ink">ربط متجر Salla</h3>
+              <h3 className="mt-3 text-xl font-semibold text-ink">مزامنة المنتجات والتصنيفات</h3>
               <ul className="mt-5 space-y-3">
-                {PHASE_03_SCOPE.map((item, index) => (
+                {PHASE_04_SCOPE.map((item, index) => (
                   <li
                     key={item}
                     className="flex items-start gap-3 text-[12.5px] leading-6 text-muted"

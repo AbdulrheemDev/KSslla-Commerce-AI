@@ -1,16 +1,31 @@
 /**
  * Salla scopes.
  *
- * Phase 03 requests the absolute minimum: `offline_access` is the documented
- * prerequisite for a refresh token. Store identity is read from
- * `GET /oauth2/user/info`, whose documented payload already includes
- * `merchant.id`, so no merchant-data scope is requested "for later".
+ * Minimum for the implemented features:
+ * - `offline_access` — documented prerequisite for a refresh token (Phase 03);
+ * - `products.read` — required by `GET /products` (Phase 04);
+ * - `categories.read` — required by `GET /categories` (Phase 04).
  *
- * Source: https://docs.salla.dev/doc-421118 (see docs/salla-reference.md §8).
+ * Nothing is requested "for later": orders, customers, inventory, and every
+ * write scope stay out until a phase actually reads or writes them.
+ *
+ * Source: https://docs.salla.dev/doc-421118, https://docs.salla.dev/5394168e0,
+ * https://docs.salla.dev/api-5394207 (see docs/salla-reference.md §2.2–2.3).
  */
-export const SALLA_REQUIRED_SCOPES = ["offline_access"] as const;
+export const SALLA_REQUIRED_SCOPES = [
+  "offline_access",
+  "products.read",
+  "categories.read",
+] as const;
 
 export type SallaScope = (typeof SALLA_REQUIRED_SCOPES)[number];
+
+/** Scopes the catalogue sync cannot work without. */
+export const SALLA_CATALOG_SCOPES = ["products.read", "categories.read"] as const;
+
+export function hasScopes(granted: readonly string[], required: readonly string[]): boolean {
+  return required.every((scope) => granted.includes(scope));
+}
 
 /**
  * Normalizes the scopes Salla reports back. The authorization docs show a

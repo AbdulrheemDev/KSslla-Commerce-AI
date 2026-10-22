@@ -21,6 +21,8 @@ export const SALLA_OFFICIAL_ENDPOINTS = {
   authorizationUrl: "https://accounts.salla.sa/oauth2/auth",
   tokenUrl: "https://accounts.salla.sa/oauth2/token",
   userInfoUrl: "https://accounts.salla.sa/oauth2/user/info",
+  /** Documented base URI for every Merchant API endpoint. */
+  apiBaseUrl: "https://api.salla.dev/admin/v2",
 } as const;
 
 export type SallaOAuthMode = "easy" | "custom";
@@ -39,6 +41,7 @@ export interface SallaConfig {
     authorizationUrl: string;
     tokenUrl: string;
     userInfoUrl: string;
+    apiBaseUrl: string;
   };
   scopes: string[];
 }
@@ -50,6 +53,7 @@ function endpointsFor(env: ServerEnv): SallaConfig["endpoints"] {
     authorizationUrl: env.SALLA_AUTH_URL ?? SALLA_OFFICIAL_ENDPOINTS.authorizationUrl,
     tokenUrl: env.SALLA_TOKEN_URL ?? SALLA_OFFICIAL_ENDPOINTS.tokenUrl,
     userInfoUrl: env.SALLA_USERINFO_URL ?? SALLA_OFFICIAL_ENDPOINTS.userInfoUrl,
+    apiBaseUrl: env.SALLA_API_URL ?? SALLA_OFFICIAL_ENDPOINTS.apiBaseUrl,
   };
 }
 

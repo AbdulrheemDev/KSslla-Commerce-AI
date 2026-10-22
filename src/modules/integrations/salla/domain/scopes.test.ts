@@ -8,8 +8,14 @@ import {
 } from "@/modules/integrations/salla/domain/scopes";
 
 describe("Salla scopes", () => {
-  it("requests only offline_access", () => {
-    expect(SALLA_REQUIRED_SCOPES).toEqual(["offline_access"]);
+  it("requests exactly the scopes the implemented features use", () => {
+    expect(SALLA_REQUIRED_SCOPES).toEqual(["offline_access", "products.read", "categories.read"]);
+  });
+
+  it("never asks for a write scope", () => {
+    for (const scope of SALLA_REQUIRED_SCOPES) {
+      expect(scope.endsWith(".read") || scope === "offline_access").toBe(true);
+    }
   });
 
   it("splits on spaces and commas", () => {

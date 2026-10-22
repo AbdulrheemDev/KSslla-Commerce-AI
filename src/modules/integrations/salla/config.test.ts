@@ -41,7 +41,7 @@ describe("Salla configuration", () => {
 
     expect(config.endpoints).toEqual(SALLA_OFFICIAL_ENDPOINTS);
     expect(config.redirectUri).toBe(REDIRECT);
-    expect(config.scopes).toEqual(["offline_access"]);
+    expect(config.scopes).toEqual(["offline_access", "products.read", "categories.read"]);
   });
 
   it("defaults to custom mode and treats easy mode as not implemented yet", () => {

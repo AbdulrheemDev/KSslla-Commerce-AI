@@ -17,6 +17,7 @@ export const PERMISSIONS = [
   "store:read",
   "store:connect",
   "store:disconnect",
+  "store:sync",
   "member:read",
   "member:invite",
   "member:remove",
@@ -39,6 +40,7 @@ export const ROLE_PERMISSIONS: Record<MembershipRole, readonly Permission[]> = {
   manager: [
     "organization:read",
     "store:read",
+    "store:sync",
     "member:read",
     "recommendation:read",
     "recommendation:decide",

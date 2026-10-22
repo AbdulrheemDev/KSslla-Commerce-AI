@@ -17,10 +17,10 @@ export const PRODUCT = {
   version: "0.1.0",
   designPartnerAr: "متجر كشخة",
   phase: {
-    number: 3,
-    label: "03",
-    titleAr: "ربط متجر Salla",
-    titleEn: "Salla OAuth & Store Connection",
+    number: 4,
+    label: "04",
+    titleAr: "مزامنة المنتجات والتصنيفات",
+    titleEn: "Products + Categories Sync",
   },
 } as const;
 
@@ -179,6 +179,11 @@ export const CURRENT_CAPABILITIES: readonly CapabilityStatus[] = [
     detailAr: "واجهة مزوّد موحّدة مع تحقق من المخرجات وإعادة محاولة — بلا مزوّد مربوط.",
   },
   {
+    labelAr: "مزامنة كتالوج للقراءة فقط",
+    detailAr:
+      "منتجات وتصنيفات من Salla إلى PostgreSQL، idempotent، بقفل لكل متجر ولا كتابة على المتجر.",
+  },
+  {
     labelAr: "واجهة تأسيسية عربية",
     detailAr: "واجهة RTL متجاوبة تعرض الحالة الفعلية فقط، دون أي بيانات وهمية.",
   },
@@ -190,13 +195,21 @@ export const DATA_STATE: readonly {
   stateAr: string;
   tone: "off" | "pending";
 }[] = [
-  { componentAr: "بيانات المتجر", stateAr: "لا توجد بيانات بعد", tone: "off" },
+  {
+    componentAr: "بيانات المتجر",
+    stateAr: "تُزامن عند الطلب — قراءة فقط",
+    tone: "pending",
+  },
   {
     componentAr: "قاعدة البيانات",
     stateAr: "PostgreSQL — تُفعّل بضبط DATABASE_URL",
     tone: "pending",
   },
-  { componentAr: "اتصال Salla", stateAr: "غير متصل — Phase 03", tone: "pending" },
+  {
+    componentAr: "اتصال Salla",
+    stateAr: "مقروء فقط — يتطلب ربط المتجر",
+    tone: "pending",
+  },
   { componentAr: "مزوّد الذكاء الاصطناعي", stateAr: "غير مهيأ — Phase 14", tone: "pending" },
 ] as const;
 
@@ -238,11 +251,11 @@ export const PRINCIPLES: readonly Principle[] = [
   },
 ] as const;
 
-export const PHASE_03_SCOPE: readonly string[] = [
-  "تطبيق Salla على Partners Portal مع Scopes دنيا.",
-  "Custom Mode مع state، وتبادل الرمز عبر النطاقات الرسمية فقط.",
-  "تشفير الرموز AES-256-GCM مع AAD لمعرّف المتجر.",
-  "تجديد single-flight، وفصل/إعادة ربط، وعرض حالة حقيقية بلا كتابة بيانات.",
+export const PHASE_04_SCOPE: readonly string[] = [
+  "قراءة فقط لمساري المنتجات والتصنيفات الموثّقين، بلا أي Endpoint غير مسجّل.",
+  "مزامنة يدوية بترتيب Categories ثم Products ثم العلاقات، ومعاملة لكل صفحة.",
+  "ترقيم تسلسلي وإعادة محاولة محدودة واحترام Retry-After عند 429.",
+  "قفل lease لكل متجر، upserts idempotent، ولا حذف هدمي بلا دليل موثّق.",
 ] as const;
 
 export const DOCUMENTS: readonly { file: string; labelAr: string }[] = [
@@ -251,5 +264,7 @@ export const DOCUMENTS: readonly { file: string; labelAr: string }[] = [
   { file: "docs/roadmap.md", labelAr: "خارطة الطريق" },
   { file: "docs/decisions.md", labelAr: "القرارات المعمارية" },
   { file: "docs/salla-reference.md", labelAr: "مرجع تكامل Salla" },
-  { file: "docs/phase-02.md", labelAr: "خطة المرحلة القادمة" },
+  { file: "docs/phase-02.md", labelAr: "تنفيذ Phase 02" },
+  { file: "docs/phase-03.md", labelAr: "تنفيذ Phase 03" },
+  { file: "docs/phase-04.md", labelAr: "تنفيذ Phase 04" },
 ] as const;

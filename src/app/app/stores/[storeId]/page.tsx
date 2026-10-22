@@ -2,12 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CommerceDataCard } from "@/components/app/commerce-data-card";
 import { SallaConnectionCard } from "@/components/app/salla-connection-card";
 import { StatusPill } from "@/components/status-pill";
 import { getDb } from "@/db/client";
+import { getCommerceOverview } from "@/modules/catalog/application/catalog-service";
 import { isAppError } from "@/lib/errors";
 import { getStoreConnection } from "@/modules/integrations/salla/application/connection-service";
 import { getSallaHealth } from "@/modules/integrations/salla/config";
+import { SALLA_CATALOG_SCOPES } from "@/modules/integrations/salla/domain/scopes";
 import { callbackReasonToMessage } from "@/modules/integrations/salla/domain/messages";
 import { requireStoreAccess } from "@/modules/stores/application/store-service";
 import { requirePageTenant } from "@/server/pages";
@@ -37,6 +40,7 @@ export default async function StoreSettingsPage({
   }
 
   const connection = await getStoreConnection(db, context, storeId);
+  const overview = await getCommerceOverview(db, context, storeId);
 
   const salla = (() => {
     try {
@@ -58,6 +62,7 @@ export default async function StoreSettingsPage({
 
   const canConnect = context.permissions.includes("store:connect");
   const canDisconnect = context.permissions.includes("store:disconnect");
+  const missingScopes = SALLA_CATALOG_SCOPES.filter((scope) => !connection.scopes.includes(scope));
 
   return (
     <div className="space-y-8">
@@ -84,8 +89,8 @@ export default async function StoreSettingsPage({
           role="status"
           className="rounded-2xl border border-teal/25 bg-teal/10 px-4 py-3 text-[12.5px] leading-6 text-teal"
         >
-          تم ربط المتجر بنجاح. الحالة الآن <span className="ltr">connected</span>. الخطوة التالية:
-          سيُستخدم هذا الاتصال لقراءة البيانات في المراحل القادمة.
+          تم ربط المتجر بنجاح. الحالة الآن <span className="ltr">connected</span>. يمكنك الآن تشغيل
+          «مزامنة الآن» لجلب المنتجات والتصنيفات إلى نسخة محلية للقراءة فقط.
         </div>
       ) : null}
 
@@ -128,12 +133,20 @@ export default async function StoreSettingsPage({
         initialError={null}
       />
 
+      <CommerceDataCard
+        storeId={store.id}
+        overview={overview}
+        canSync={context.permissions.includes("store:sync")}
+        connected={connection.status === "connected"}
+        missingScopes={missingScopes}
+      />
+
       <section className="rounded-2xl border border-line bg-surface/40 p-5">
-        <h2 className="text-sm font-semibold text-ink">ما لا تفعله هذه المرحلة</h2>
+        <h2 className="text-sm font-semibold text-ink">حدود هذه المرحلة</h2>
         <ul className="mt-2 grid list-inside list-disc gap-1 text-[12px] leading-6 text-muted">
-          <li>لا مزامنة منتجات أو طلبات أو عملاء أو مخزون.</li>
-          <li>لا Webhooks عامة، ولا كتابة أي بيانات إلى Salla.</li>
-          <li>لا تحليلات أو تسويق أو ذكاء اصطناعي.</li>
+          <li>مزامنة المنتجات والتصنيفات فقط — بلا طلبات أو عملاء أو مخزون.</li>
+          <li>قراءة فقط من Salla؛ لا إنشاء أو تعديل أو حذف لأي عنصر.</li>
+          <li>لا Webhooks، ولا تحليلات أو تسويق أو ذكاء اصطناعي.</li>
         </ul>
       </section>
     </div>

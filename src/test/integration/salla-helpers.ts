@@ -15,6 +15,7 @@ export function configureMockSalla(url: string): void {
   process.env.SALLA_AUTH_URL = `${url}/oauth2/auth`;
   process.env.SALLA_TOKEN_URL = `${url}/oauth2/token`;
   process.env.SALLA_USERINFO_URL = `${url}/oauth2/user/info`;
+  process.env.SALLA_API_URL = `${url}/admin/v2`;
   resetServerEnvCache();
 }
 
@@ -27,6 +28,7 @@ export function clearMockSalla(): void {
     "SALLA_AUTH_URL",
     "SALLA_TOKEN_URL",
     "SALLA_USERINFO_URL",
+    "SALLA_API_URL",
   ]) {
     delete process.env[key];
   }

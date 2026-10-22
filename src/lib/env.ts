@@ -43,6 +43,7 @@ export const serverEnvSchema = z.object({
   SALLA_REDIRECT_URI: z.url({ protocol: /^https?$/ }).optional(),
   SALLA_OAUTH_MODE: z.enum(["custom", "easy"]).default("custom"),
   // Development/test only. Rejected in production by the Salla config layer.
+  SALLA_API_URL: z.url({ protocol: /^https?$/ }).optional(),
   SALLA_AUTH_URL: z.url({ protocol: /^https?$/ }).optional(),
   SALLA_TOKEN_URL: z.url({ protocol: /^https?$/ }).optional(),
   SALLA_USERINFO_URL: z.url({ protocol: /^https?$/ }).optional(),

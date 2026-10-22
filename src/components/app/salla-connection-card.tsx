@@ -97,7 +97,7 @@ export function SallaConnectionCard({
   const disabled = busy || pending;
 
   return (
-    <section className="rounded-3xl border border-gold/20 bg-gold/[0.06] p-6">
+    <section id="salla-connection" className="rounded-3xl border border-gold/20 bg-gold/[0.06] p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-gold-soft">ربط Salla</h2>

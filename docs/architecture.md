@@ -42,28 +42,28 @@ KSHakha Commerce AI هو **AI Commerce Operating System** لمتاجر Salla، �
 
 **الاستنتاج:** المشروع Greenfield. لا يوجد كود قائم يستحق الحفاظ عليه، لذلك بُني حد أدنى من الأساس بدل إعادة بناء نظام غير موجود.
 
-### A.2 الحالة التقنية بعد Phase 03
+### A.2 الحالة التقنية بعد Phase 04
 
 | الطبقة | التقنية / الحالة |
 |---|---|
 | Framework | Next.js **16.4.2** (App Router, Turbopack build) |
 | UI | React **19.3.1**، Tailwind CSS **4.3.3** (CSS-first tokens)، صفحة تأسيسية RTL |
 | Language | TypeScript **5.9.3**، `strict`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax` |
-| Backend | 13 Route Handler: صحة، مصادقة، جلسة، مؤسسة، أعضاء، دعوات، متاجر، تدقيق |
-| Database | **PostgreSQL 16+** مع 7 جداول وهجرتين (بنية + RLS) عبر Drizzle |
+| Backend | 20 Route Handler: صحة، مصادقة، جلسة، مؤسسة، أعضاء، دعوات، متاجر، تدقيق، Salla OAuth، كتالوج |
+| Database | **PostgreSQL 16+** مع 14 جدولًا و6 هجرات (بنية + RLS + كتالوج) عبر Drizzle |
 | ORM / Migrations | Drizzle ORM **0.45.4** + drizzle-kit **0.31.11** |
 | Authentication | **منفّذة** — scrypt، جلسات مخزّنة، إبطال فوري، كوكي `__Host-` |
 | Authorization | **منفّذة** — RBAC بخمسة أدوار + RLS كطبقة ثانية |
 | AI | عقد `AiProvider` + `AiGateway` + سجل مزوّدين **فارغ** (بلا مزوّد) |
-| Salla integration | **لا توجد** — Phase 03 |
+| Salla integration | **OAuth + قراءة الكتالوج** — Custom Mode، قراءة فقط، محاكي بروتوكول فقط |
 | Queue / Workers | **لا توجد** — Phase 06 |
 | Logging | pino **10.4.0** مع تنقية مسارات حساسة |
 | Validation | Zod **4.6.7** (بيئة + مدخلات AI + مخرجات منظمة) |
-| Testing | Vitest **5.0.5** — وحدة + تكامل + أمن على PostgreSQL حقيقي |
+| Testing | Vitest **5.0.5** — 146 وحدة + 88 تكامل/أمن على PostgreSQL حقيقي |
 | Lint / Format | ESLint **9.39.5** (flat config) + Prettier **3.9.10** |
 | CI | GitHub Actions (lint → typecheck → unit → PostgreSQL integration → secrets → build) |
 | Deployment | **غير مهيأ** — التصميم موثّق فقط |
-| Docs | `architecture`, `product-spec`, `roadmap`, `decisions`, `salla-reference`, `phase-02` |
+| Docs | `architecture`, `product-spec`, `roadmap`, `decisions`, `salla-reference`, `phase-02…04` |
 
 ### A.3 ما هو موجود فعليًا في الكود
 
@@ -71,17 +71,18 @@ KSHakha Commerce AI هو **AI Commerce Operating System** لمتاجر Salla، �
 - `src/lib/errors.ts` — تصنيف أخطاء موحّد مع ربط HTTP وحجب التفاصيل العامة.
 - `src/lib/logger.ts` — سجلات JSON مع `redact` للرموز وكلمات المرور.
 - `src/lib/ai/*` — عقد المزوّد، سجل فارغ، وبوابة توليد. **لم يتغيّر في Phase 02.**
-- `src/db/` — اتصال postgres.js، `withTenantTransaction`، الهجرات، و7 جداول.
+- `src/db/` — اتصال postgres.js، `withTenantTransaction`، الهجرات، و14 جدولًا.
 - `src/modules/identity` — scrypt، رموز HMAC، مصفوفة صلاحيات، تسجيل/دخول/جلسات.
 - `src/modules/organizations` — المؤسسة، العضويات، الدعوات، وقواعد منع التصعيد.
-- `src/modules/stores` — سجلات داخلية `not_connected` مع عزل صريح.
+- `src/modules/stores` — سجلات داخلية مرتبطة أو غير مرتبطة، مع عزل صريح.
+- `src/modules/catalog` — DTO/Zod، mappers، ترقيم، سياسة إعادة محاولة، مستودعات المنتجات/التصنيفات، وخدمتا القراءة والمزامنة.
 - `src/modules/audit` — سجل تدقيق append-only بلا أسرار.
 - `src/modules/integrations/salla` — نطاق OAuth، عميل البروتوكول، مدير الرموز، خدمة الاتصال، ومستودعات الحالة/الاتصال.
 - `src/lib/crypto.ts` — تشفير AES-256-GCM مع AAD للمستأجر.
 - `src/server/` — CSRF، معدّل الطلبات، سياق المستأجر، طبقة API موحّدة.
-- `src/app/*` — واجهة عربية RTL: دخول، تسجيل، تهيئة، مساحة مؤسسة، أعضاء، متاجر، بطاقة ربط Salla، دعوة.
-- 9 جداول (أُضيف `store_connections` و`oauth_states`)، و3 هجرات RLS.
-- 170 اختبارًا: 106 وحدة + 64 تكامل/أمن على PostgreSQL حقيقي (منها 32 لـ Salla: 25 للتفويض/الاتصال و7 لإدارة الرموز).
+- `src/app/*` — واجهة عربية RTL: دخول، تسجيل، تهيئة، مساحة مؤسسة، أعضاء، متاجر، بطاقة ربط Salla، منتجات وتصنيفات، دعوة.
+- 14 جدولًا (أُضيفت `products`, `categories`, `product_categories`, `sync_runs`, `sync_locks`)، و5 هجرات.
+- 234 اختبارًا: 146 وحدة + 88 تكامل/أمن على PostgreSQL حقيقي (منها 54 لـ Salla: 25 تفويض/اتصال، 7 رموز، 22 كتالوج).
 
 ### A.2.1 مسار ربط Salla (Phase 03)
 
@@ -112,7 +113,7 @@ GET /api/integrations/salla/callback?code&state
 
 ### A.4 ما هو غير موجود بشكل مقصود
 
-لا مزامنة منتجات/طلبات/عملاء/مخزون، لا Webhooks عامة (ولا `app.store.authorize`)، لا Dashboard بيانات، لا SEO، لا Marketing، لا Agent، لا أي مزوّد AI، ولا أي عملية كتابة إلى Salla. هذه ليست نقصًا؛ بل **حدود المرحلة**.
+لا مزامنة طلبات/عملاء/مخزون، ولا مزامنة مجدولة أو Webhooks عامة (ولا `app.store.authorize`)، لا Dashboard بيانات، لا SEO، لا Marketing، لا Agent، لا أي مزوّد AI، ولا أي عملية كتابة إلى Salla. هذه ليست نقصًا؛ بل **حدود المرحلة**.
 
 ---
 
@@ -828,9 +829,10 @@ SallaClient
 
 | النوع | النطاق | متى |
 |---|---|---|
-| Unit | domain، حوكمة، env، AI gateway | الآن (43 اختبارًا) |
-| Integration | Postgres + repositories + use cases | Phase 02 |
-| Contract | Salla client مقابل fixtures/Demo Store | Phase 03 |
+| Unit | domain، حوكمة، env، AI gateway، DTO/mappers، ترقيم، إعادة محاولة | الآن (139 اختبارًا) |
+| Integration | Postgres + repositories + use cases + RLS | الآن (86 اختبارًا) |
+| Contract | Salla client مقابل محاكي بروتوكول محلي (Demo Store غير متاح) | Phase 04 |
+| Sync concurrency | قفل lease، 10 طلبات متزامنة، فشل صفحة وسط التشغيل | Phase 04 |
 | Webhook security | توقيع، dedupe، replay، retries | Phase 06 |
 | E2E | تسجيل → ربط → موافقة → إجراء | Phase 15 |
 | Security | عزل مستأجرين، IDOR، CSRF، input | من Phase 02 |

@@ -416,7 +416,7 @@ offline_access
 | 2 | عنوان الرمز ونقطة التجديد هما `https://accounts.salla.sa/oauth2/token` | Salla Docs — Authorization | https://docs.salla.dev/doc-421118 | 2026-10-22 | ثابت واحد `SALLA_OFFICIAL_ENDPOINTS.tokenUrl` يُستخدم للتبادل والتجديد |
 | 3 | جسم طلب الرمز `application/x-www-form-urlencoded` يحتوي `grant_type`, `code`, `redirect_uri`, `client_id`, `client_secret` | RFC 6749 §4.1.3 + عميل Salla الرسمي (ثانوي) | https://github.com/SallaApp/oauth2-merchant/blob/master/src/Provider/Salla.php | 2026-10-22 | `exchangeAuthorizationCode()` يرسل الجسم كـ URLSearchParams مع `content-type` الصحيح؛ لا بيانات اعتماد في الـ URL |
 | 4 | التجديد يستخدم `grant_type=refresh_token` و`refresh_token` مع نفس بيانات العميل | Salla Docs — Authorization (وصف التجديد) + العميل الرسمي | https://docs.salla.dev/doc-421118 | 2026-10-22 | `refreshAccessToken()` يرسل الحقول الأربعة فقط |
-| 5 | `offline_access` شرط الحصول على refresh token | Salla Docs — Authorization (Important Notes) | https://docs.salla.dev/doc-421118 | 2026-10-22 | `SALLA_REQUIRED_SCOPES = ["offline_access"]`؛ لا سكوبات إضافية في Phase 03 |
+| 5 | `offline_access` شرط الحصول على refresh token | Salla Docs — Authorization (Important Notes) | https://docs.salla.dev/doc-421118 | 2026-10-22 | `SALLA_REQUIRED_SCOPES = ["offline_access"]` في Phase 03؛ أُضيف سكوبا القراءة في Phase 04 (§10.4) |
 | 6 | صلاحية access token 14 يومًا | Salla Docs — Authorization + Get Started | https://docs.salla.dev/doc-421118 | 2026-10-22 | `ACCESS_TOKEN_FALLBACK_MS = 14d`، وتجديد استباقي قبل دقيقة |
 | 7 | صلاحية refresh token شهر واحد | Salla Docs — Get Started | https://docs.salla.dev/ | 2026-10-22 | `REFRESH_TOKEN_TTL_MS = 30d` يُخزَّن في `refresh_token_expires_at` |
 | 8 | `expires` يُعاد كثواني (Unix seconds) | Salla Docs — Authorization (Important Notes) | https://docs.salla.dev/doc-421118 | 2026-10-22 | `computeAccessTokenExpiry()` يقبل `expires` و`expires_in` ويتحمّل المللي ثانية |
@@ -463,3 +463,127 @@ offline_access
 - **التعارض:** أفضل مسار للنشر (Easy Mode) لا يمر عبر callback أصلًا، بينما Prompt Phase 03 يطلب تدفّق callback و`state`.
 - **القرار:** تنفيذ Custom Mode (الموثّق للاختبار) الآن، مع تصميم نموذج الاتصال بحيث يستقبل الرموز من أي مصدر (callback أو Webhook لاحقًا) عبر نفس `saveAuthorizedConnection`، وإعلان `implemented: false` عند `SALLA_OAUTH_MODE=easy` بدل الادعاء الكاذب.
 - **الأثر:** ADR-034 يشرح المسار، و`docs/phase-03.md` §القيود يذكر أن الإنتاج يستلزم Webhook `app.store.authorize` في مرحلة لاحقة.
+
+---
+
+## 10. سجل أدلة Phase 04 — المنتجات والتصنيفات
+
+### 10.1 `GET /admin/v2/products`
+
+| الحقل | القيمة |
+|---|---|
+| **Endpoint** | `GET https://api.salla.dev/admin/v2/products` |
+| **Purpose** | قراءة قائمة منتجات المتجر لبناء نسخة محلية للتحليل |
+| **HTTP Method** | `GET` |
+| **Required Scope** | `products.read` (Products Read Only) |
+| **Authentication** | `Authorization: Bearer <access_token>` من `SallaTokenManager` |
+| **Pagination** | `page`, `per_page` (الحد الأقصى الموثّق 60)؛ الاستجابة تحمل `pagination.count/total/perPage/currentPage/totalPages/links` |
+| **Response Shape** | `{ status, success, data: Product[], pagination }` |
+| **Rate Limit Considerations** | خطة المتجر: Plus 120 / Pro 360 / Special 720 طلبًا في الدقيقة، وبعد التجاوز طلب واحد/ثانية؛ ترويسات `X-RateLimit-*` و`Retry-After` |
+| **Source** | Salla Docs — List Products |
+| **URL** | https://docs.salla.dev/5394168e0 |
+| **Verified At** | 2026-10-22 |
+| **Implementation Notes** | يُقرأ فقط: `id, name, sku, type, status, description, url, main_image, thumbnail, price, regular_price, sale_price, quantity, is_available, updated_at, categories[].id, brand, urls, metadata`. لا تُقرأ `options`/`skus` (مخزون، Phase 06+). `format=light` غير مستخدم لأن اقتراحه لا يضمن حقل `categories` |
+
+### 10.2 `GET /admin/v2/categories`
+
+| الحقل | القيمة |
+|---|---|
+| **Endpoint** | `GET https://api.salla.dev/admin/v2/categories` |
+| **Purpose** | قراءة شجرة التصنيفات لربط المنتجات بها |
+| **HTTP Method** | `GET` |
+| **Required Scope** | `categories.read` (Categories Read Only) |
+| **Authentication** | `Authorization: Bearer <access_token>` |
+| **Pagination** | نفس كتلة `pagination` القياسية (`per_page` بحد أقصى 60) |
+| **Response Shape** | `{ status, success, data: Category[], pagination }` |
+| **Rate Limit Considerations** | نفس حدود المتجر؛ نُسلسل الصفحات ولا نفتح طلبات متوازية |
+| **Source** | Salla Docs — List Categories |
+| **URL** | https://docs.salla.dev/api-5394207 |
+| **Verified At** | 2026-10-22 |
+| **Implementation Notes** | الحقول: `id, name, image, parent_id, sort_order, status, update_at, urls, metadata, show_in`. لا يوجد حقل `slug` في الاستجابة (يُشتق من `urls.customer` فقط عند الحاجة مستقبلًا؛ لم يُخزَّن الآن). `parent_id = 0` يعني جذرًا |
+
+### 10.3 Pagination
+
+- المصدر: https://docs.salla.dev/pagination — «All paginated responses will append ... `pagination`» و«maximum value for the `per_page` query parameter is 60».
+- نستخدم `per_page=30`: أقل من الحد الأقصى، ويُبقي معاملة كل صفحة صغيرة.
+- نعتمد `currentPage`/`totalPages` من الاستجابة، لا من عدّاد محلي، ونرفض أي استجابة `currentPage` فيها لا يساوي الصفحة المطلوبة.
+- حماية من الحلقات: بصمة لكل صفحة (معرّفات خارجية مرتبة)، سقف 200 صفحة، ورفض صفحة فارغة قبل الأخيرة.
+
+### 10.4 Scopes
+
+| Scope | الاستخدام | الحالة |
+|---|---|---|
+| `offline_access` | refresh token | مطلوب منذ Phase 03 |
+| `products.read` | `GET /products` | مطلوب منذ Phase 04 |
+| `categories.read` | `GET /categories` | مطلوب منذ Phase 04 |
+
+لا سكوبات كتابة ولا سكوبات مراحل لاحقة. الاتصال القديم (Phase 03) لا يملك سكوبي القراءة، لذلك تتطلب المزامنة إعادة ربط واضحة (`missing_scope`).
+
+### 10.5 Rate limits
+
+- المصدر: https://docs.salla.dev/rate-limiting (Verified At 2026-10-22).
+- الحدود حسب الخطة فقط؛ لا رقم مضمّن في الكود.
+- عند `429`: يُقرأ `Retry-After` إن وُجد ويُنتظر بالقيمة نفسها، ثم يُعاد الطلب ضمن سقف المحاولات. لا إعادة محاولة فورية. إن طلب المزوّد انتظارًا أطول من 30 ثانية يتوقف التشغيل (`rate_limited`) بدل إعادة المحاولة مبكرًا.
+- `1 request/second` بعد تجاوز الحد هو سلوك الخادم، وليس سياسة نطبقها محليًا.
+
+### 10.6 Error behaviour
+
+| الحالة | تفسير Salla | تعاملنا |
+|---|---|---|
+| 401 | رمز غير صالح، تطبيق غير مثبّت، أو سكوب غير ممنوح | تجديد واحد ثم إعادة الطلب مرة؛ إن تكرر → `reauth_required` |
+| 403 | ممنوع (حجب مؤقت أو وصول غير مسموح) | فشل دائم، بلا إعادة محاولة |
+| 404 | المسار/العنصر غير موجود | فشل دائم |
+| 422 | أخطاء تحقق | لا يحدث في القراءة؛ فشل دائم |
+| 429 | تجاوز الحد | إعادة محاولة بعد `Retry-After` |
+| 5xx | خطأ خادم مؤقت | إعادة محاولة ضمن السقف |
+| جسم غير مطابق للمخطط | تغيّر عقد | `SallaInvalidResponseError`، تُفشل التشغيل ولا تُخزَّن بيانات تالفة |
+
+المصدر: https://docs.salla.dev/responses — ويذكر صراحةً أن 401 يُستخدم أيضًا عند «Not allowed Scopes».
+
+### 10.7 Deletion behaviour
+
+- لا توثّق Salla نقطة نهاية أو حقلًا موثوقًا لسرد المحذوف عبر `GET /products` أو `GET /categories`، ولا تعِد `deleted` كحالة موثّقة شاملة.
+- القرار: **لا حذف تلقائي إطلاقًا** في Phase 04. يُسجَّل `last_seen_at` عند كل ظهور ناجح، ويبقى الصف إن اختفى من القائمة.
+- المرشح للمرحلة اللاحقة: مقارنة `last_seen_at` بمعرّفات، بعد التحقق من أي Webhook/Audit رسمي، وقرار ADR مستقل.
+
+### 10.8 Field notes
+
+- `product.status` يعيد أمثلة `sale`/`hidden`/`out`/`sold`؛ لا تُنشر قائمة enum مغلقة، لذلك يُخزَّن كنص كما هو ولا يُترجم إلى «محذوف».
+- `category.status` مثالها `active`/`hidden`.
+- `category.update_at` (وليس `updated_at`) هو الاسم الموثّق في استجابة التصنيفات، وقد يصل كائنًا `{date, timezone_type, timezone}` داخل منتج.
+- الأسعار كائنات `{amount, currency}`؛ `sale_price` قد يكون `{}` — تُطبَّع إلى `null` لا إلى صفر.
+- `quantity` يصل رقمًا أو نصًا (`"50"`)؛ يُطبَّع إلى عدد صحيح أو `null`.
+
+---
+
+## 11. تعارضات وثائق Phase 04
+
+### 11.1 `per_page` مقابل `count`
+
+- **التعارض:** صفحة Pagination تقول «The `count` parameter may be used to increase the number of results per request»، بينما المثال نفسه وأمثلة المسارات تستخدم `per_page`.
+- **القرار:** نرسل `per_page` فقط (مذكور صراحةً في الصفحة نفسها وفي curl الخاص بالمنتجات)، ولا نرسل `count` غير الموثّق لكل مسار.
+- **الأثر:** إن غيّرت Salla الاسم، يُعدَّل `catalog-client.ts` وحده.
+
+### 11.2 المنطقة الزمنية للطوابع
+
+- **التعارض:** `updated_at`/`update_at` تُعرض كنص `YYYY-MM-DD HH:mm:ss` بلا منطقة زمنية، وأحيانًا ككائن يحمل `Asia/Riyadh`.
+- **القرار:** تُحلَّل النصوص كـ UTC بشكل حتمي، وتُستخدم فقط لتتبّع التغيّر؛ لا تُعرض كتوقيت دقيق للمستخدم. الواجهة تعرض `updated_at` المحلي (وقت المزامنة) بدلًا منها.
+- **الأثر:** لا اعتماد على دقة الطابع الخارجي في أي قرار.
+
+### 11.3 حالة المنتج غير مغلقة
+
+- **التعارض:** لا قائمة enum موثّقة لحالات المنتج.
+- **القرار:** `status` نصّي كما هو، مع خريطة عرض عربية لأشهر القيم فقط، وأي قيمة أخرى تُعرض كما وردت.
+- **الأثر:** لا ترجمة صامتة ولا استنتاج حذف.
+
+### 11.4 عدم وجود `slug` للتصنيف
+
+- **التعارض:** متجر Salla يعرض مسارًا يحتوي ما يشبه الـ slug، لكن استجابة API لا تحمل حقل `slug`.
+- **القرار:** لا نولّد slug ولا نستخرجه بالتخمين؛ الواجهة تعرض الاسم فقط.
+- **الأثر:** إن احتاجته مرحلة لاحقة، يُشتق من `urls.customer` بقرار موثّق.
+
+### 11.5 `categories` داخل المنتج
+
+- **التعارض:** الوثائق تعرض مصفوفة `categories` داخل المنتج، لكنها قد تكون فارغة، ولا تضمن أن التصنيف مُزامَن بعد.
+- **القرار:** تُقرأ المعرّفات فقط، وتُربط بما هو موجود محليًا؛ الارتباط بمعرّف غير معروف يُتجاهل ويُحصى (`items_skipped`) بدل إنشاء تصنيف وهمي.
+- **الأثر:** ترتيب Categories → Products إلزامي، وأي تصنيف مفقود يظهر في عدّاد لا في بيانات مخترعة.

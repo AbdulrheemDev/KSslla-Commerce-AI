@@ -22,6 +22,12 @@ export const AUDIT_ACTIONS = [
   "salla.connection.disconnected",
   "salla.token.refreshed",
   "salla.token.refresh_failed",
+  "salla.products.sync_started",
+  "salla.products.sync_completed",
+  "salla.products.sync_failed",
+  "salla.categories.sync_started",
+  "salla.categories.sync_completed",
+  "salla.categories.sync_failed",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

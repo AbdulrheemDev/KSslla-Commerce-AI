@@ -196,6 +196,48 @@ async function loadHandler(
     return { dispatch };
   }
 
+  const catalogSync = normalized.match(
+    /^\/api\/organizations\/current\/stores\/([^/]+)\/catalog\/sync$/,
+  );
+  if (catalogSync) {
+    const handlers =
+      (await import("@/app/api/organizations/current/stores/[storeId]/catalog/sync/route")) as Record<
+        string,
+        unknown
+      >;
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
+  const catalogProducts = normalized.match(
+    /^\/api\/organizations\/current\/stores\/([^/]+)\/catalog\/products$/,
+  );
+  if (catalogProducts) {
+    const handlers =
+      (await import("@/app/api/organizations/current/stores/[storeId]/catalog/products/route")) as Record<
+        string,
+        unknown
+      >;
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
+  const catalogCategories = normalized.match(
+    /^\/api\/organizations\/current\/stores\/([^/]+)\/catalog\/categories$/,
+  );
+  if (catalogCategories) {
+    const handlers =
+      (await import("@/app/api/organizations/current/stores/[storeId]/catalog/categories/route")) as Record<
+        string,
+        unknown
+      >;
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
   if (normalized === "/api/integrations/salla/callback") {
     const handlers = (await import("@/app/api/integrations/salla/callback/route")) as Record<
       string,

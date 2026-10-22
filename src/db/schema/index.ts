@@ -8,3 +8,5 @@ export * from "@/db/schema/invitations";
 export * from "@/db/schema/audit-logs";
 export * from "@/db/schema/store-connections";
 export * from "@/db/schema/oauth-states";
+export * from "@/db/schema/catalog";
+export * from "@/db/schema/sync";

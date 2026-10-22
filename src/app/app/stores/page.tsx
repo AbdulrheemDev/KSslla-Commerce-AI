@@ -20,8 +20,8 @@ export default async function StoresPage() {
       <section>
         <h1 className="text-2xl font-semibold tracking-tight text-ink">المتاجر</h1>
         <p className="mt-2 max-w-2xl text-[13px] leading-7 text-muted">
-          هذه سجلات داخلية لتنظيم العمل فقط. لا يوجد اتصال بـ <span className="ltr">Salla</span>،
-          ولا تُقرأ أو تُكتب أي بيانات متجر في هذه المرحلة.
+          سجلات داخلية مرتبطة بـ <span className="ltr">Salla</span> عبر تفويض رسمي. تُقرأ المنتجات
+          والتصنيفات فقط، ولا تُكتب أي بيانات إلى Salla.
         </p>
       </section>
 
@@ -29,7 +29,8 @@ export default async function StoresPage() {
         <section className="rounded-2xl border border-line bg-surface/70 p-5">
           <h2 className="text-sm font-semibold text-ink">إضافة سجل متجر</h2>
           <p className="mt-1 text-[11.5px] leading-6 text-muted">
-            اختياري. الحالة ستظهر دائمًا كـ <span className="ltr">not_connected</span>.
+            اختياري. يبدأ السجل كـ <span className="ltr">not_connected</span> حتى تربطه بتفويض Salla
+            من صفحة المتجر.
           </p>
           <div className="mt-4">
             <CreateStoreForm />
@@ -61,7 +62,9 @@ export default async function StoresPage() {
                       {store.platform} · {store.status}
                     </p>
                   </div>
-                  <StatusPill tone="amber">غير متصل</StatusPill>
+                  <StatusPill tone={store.status === "connected" ? "teal" : "amber"}>
+                    {store.status === "connected" ? "متصل" : "غير متصل"}
+                  </StatusPill>
                 </Link>
               </li>
             ))}

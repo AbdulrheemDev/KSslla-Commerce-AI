@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { LogoutButton } from "@/components/auth/logout-button";
 import { BrandMark } from "@/components/brand-mark";
+import { PRODUCT } from "@/config/product";
 import { StatusPill } from "@/components/status-pill";
 import {
   ROLE_LABELS_AR,
@@ -36,7 +37,7 @@ export function AppNav({
           <span>
             <span className="block text-sm font-semibold text-ink">{organizationName}</span>
             <span className="block text-[11px] text-muted">
-              KSHakha Commerce AI · <span className="ltr">Phase 02</span>
+              KSHakha Commerce AI · <span className="ltr">Phase {PRODUCT.phase.label}</span>
             </span>
           </span>
         </Link>

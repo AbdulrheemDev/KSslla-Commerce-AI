@@ -181,6 +181,7 @@
 
 ```text
 store:read          store:connect        store:disconnect
+store:sync
 member:read         member:invite        member:remove
 role:update         audit:read
 recommendation:read recommendation:decide
@@ -195,6 +196,7 @@ billing:manage
 | `store:read` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `store:connect` | ✅ | ✅ | ❌ | ❌ | ❌ |
 | `store:disconnect` | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `store:sync` | ✅ | ✅ | ✅ | ❌ | ❌ |
 | `member:read` | ✅ | ✅ | ✅ | ❌ | ❌ |
 | `member:invite` | ✅ | ✅ | ❌ | ❌ | ❌ |
 | `member:remove` | ✅ | ✅ | ❌ | ❌ | ❌ |

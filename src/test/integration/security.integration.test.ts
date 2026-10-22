@@ -10,15 +10,19 @@ import { ApiClient, registerViaApi, resetState } from "@/test/integration/helper
 function rawLoginRequest(options: {
   body: unknown;
   origin?: string;
+  host?: string;
+  forwardedHost?: string;
   csrfCookie?: string;
   csrfHeader?: string;
   cookie?: string;
 }) {
   const headers = new Headers({
-    host: "localhost:3000",
+    host: options.host ?? "localhost:3000",
     origin: options.origin ?? "http://localhost:3000",
     "content-type": "application/json",
   });
+
+  if (options.forwardedHost) headers.set("x-forwarded-host", options.forwardedHost);
 
   const cookies = [
     options.cookie,
@@ -93,6 +97,52 @@ describe("security controls", () => {
         csrfCookie,
         csrfHeader: csrfCookie,
         origin: "https://evil.example",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("accepts a proxied request whose Host was rewritten by the proxy", async () => {
+    const registered = await registerViaApi({
+      email: "proxied@example.com",
+      organizationName: "Proxied org",
+    });
+
+    const csrfCookie = registered.client.cookies.get(CSRF_COOKIE_NAME)!;
+
+    // The proxy terminates TLS and forwards to the upstream socket, so `Host`
+    // is the internal address while the browser's Origin is the public one.
+    const response = await invokeLogin(
+      rawLoginRequest({
+        body: { email: "proxied@example.com", password: registered.password },
+        host: "127.0.0.1:4010",
+        forwardedHost: "4010-preview.example.app",
+        origin: "https://4010-preview.example.app",
+        csrfCookie,
+        csrfHeader: csrfCookie,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  it("still rejects a foreign origin that spoofs the forwarded host list", async () => {
+    const registered = await registerViaApi({
+      email: "proxied-evil@example.com",
+      organizationName: "Proxied evil org",
+    });
+
+    const csrfCookie = registered.client.cookies.get(CSRF_COOKIE_NAME)!;
+
+    const response = await invokeLogin(
+      rawLoginRequest({
+        body: { email: "proxied-evil@example.com", password: registered.password },
+        host: "127.0.0.1:4010",
+        forwardedHost: "4010-preview.example.app",
+        origin: "https://evil.example",
+        csrfCookie,
+        csrfHeader: csrfCookie,
       }),
     );
 

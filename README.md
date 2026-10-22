@@ -2,11 +2,24 @@
 
 > **نظام تشغيل ذكي للتجارة الإلكترونية** لمتاجر Salla. يفهم المتجر، يحلّل أداءه، يكتشف الفرص والمشكلات، يقترح الإجراءات، ثم ينفّذها بعد موافقة صريحة ويقيس أثرها.
 
-**الحالة الحالية:** `Phase 03 — Salla OAuth & Store Connection` منفّذة تقنيًا وبانتظار مراجعة المالك.  
-**لا توجد مزامنة بيانات، ولا Webhooks، ولا تحليلات، ولا مزوّد ذكاء اصطناعي مربوط، ولا كتابة على أي متجر.**  
-**لم يُختبر التفويض مع Salla الحقيقية:** لا مفاتيح تطبيق ولا Demo Store في هذه البيئة؛ كل الاختبارات بروتوكولية على محاكي محلي.**
+**الحالة الحالية:** `Phase 04 — Products + Categories Sync` منفّذة تقنيًا وبانتظار مراجعة المالك.  
+**لا طلبات ولا عملاء ولا مخزون، ولا Webhooks، ولا تحليلات، ولا مزوّد ذكاء اصطناعي مربوط، ولا كتابة على أي متجر.**  
+**لم يُختبر الاستدعاء الحقيقي لـ Salla:** لا مفاتيح تطبيق ولا Demo Store في هذه البيئة؛ كل الاختبارات بروتوكولية على محاكي محلي.
 
 ---
+
+## ما تم في Phase 04
+
+- **مزامنة كتالوج للقراءة فقط:** `GET /admin/v2/products` و`GET /admin/v2/categories` عبر عميل مقيد بطريقتين فقط، لا مسار كتابة ولا Endpoint غير موثّق.
+- **نموذج بيانات محلي:** `products`, `categories`, `product_categories`, `sync_runs`, `sync_locks` مع RLS، مفاتيح خارجية فريدة `(store_id, external_id)`، وعلاقة many-to-many بمركّب أساسي.
+- **مزامنة آمنة وقابلة للتوسع:** ترتيب Categories → Products، معاملة لكل صفحة، upsert idempotent، ترقيم تسلسلي مع حراسة حلقات، وإعادة محاولة محدودة (شبكة/429/5xx فقط).
+- **قفل واحد لكل متجر:** lease في قاعدة البيانات بمُهلة 120 ثانية؛ عشرة طلبات متزامنة تنتج تشغيلًا واحدًا وتسعة `409`.
+- **لا حذف هدمي:** `last_seen_at` يُسجَّل، والصف يبقى عند غيابه من القائمة؛ لا استنتاج حذف بلا دليل موثّق.
+- **حالة مزامنة صادقة:** `never/running/succeeded/failed` مع `last_success_at`, `last_error_code`, عدّادات الصفحات والعناصر، و`correlationId` لكل تشغيل.
+- **سكوبات دنيا:** `offline_access`, `products.read`, `categories.read`؛ وكل اتصال قديم يحتاج إعادة ربط واحدة (يفحصه الخادم ويطلبه صراحةً).
+- **واجهة عربية RTL:** بطاقة «بيانات التجارة» بأرقام من قاعدة البيانات، قائمة منتجات ببحث وترقيم، صفحة تفاصيل محلية، وقائمة تصنيفات بعدد منتجات محسوب فعليًا.
+- **اختبارات:** 146 وحدة + 88 تكامل/أمن (منها 22 للكتالوج، و9 لـCSRF/العزل: ترقيم، 429، 500، جسم تالف، حلقة صفحات، عزل، تزامن، RLS).
+- **الوثائق:** ADR-038 (نموذج المزامنة)، ADR-039 (القفل والترقيم وإعادة المحاولة)، ADR-040 (توسيع السكوبات)، وسجل أدلة كامل في `docs/salla-reference.md` §10–§11.
 
 ## ما تم في Phase 03
 
@@ -26,7 +39,7 @@
 - **PostgreSQL + Drizzle**: سبعة جداول (`users`, `organizations`, `organization_members`, `invitations`, `stores`, `sessions`, `audit_logs`) وهجرتان: بنية + سياسات RLS.
 - **مصادقة**: تسجيل/دخول/خروج بجلسات مخزّنة في قاعدة البيانات، كلمات مرور `scrypt`، رموز عشوائية يُخزَّن HMAC-SHA256 منها فقط، وكوكي `__Host-ksh_session` (`HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`).
 - **تعدد مستأجرين**: `TenantContext` مشتق من الجلسة فقط (Session → Organization → Membership → Role)، وRLS بـ `FORCE` على أربعة جداول، واختبارات عزل حقيقية.
-- **RBAC**: خمسة أدوار (Owner/Admin/Manager/Analyst/Viewer) وخمسة عشر صلاحية، مع منع تصعيد الصلاحيات وإزالة آخر مالك.
+- **RBAC**: خمسة أدوار (Owner/Admin/Manager/Analyst/Viewer) وستة عشر صلاحية (منها `store:sync` منذ Phase 04)، مع منع تصعيد الصلاحيات وإزالة آخر مالك.
 - **دعوات**: رموز لمرة واحدة تنتهي بعد 7 أيام، مربوطة ببريد المدعو.
 - **حماية الطلبات**: CSRF (Origin/Referer + double-submit token)، حدّ معدّل للدخول/التسجيل/الدعوات، وأخطاء موحّدة 401/403/404/409/422/429.
 - **تدقيق**: أحداث `user.*`, `organization.*`, `member.*`, `store.created`, `session.revoked` بلا كلمات مرور أو رموز أو PII غير لازمة.
@@ -35,7 +48,7 @@
 
 ## ما لم يُبنَ (مقصود)
 
-مزامنة منتجات/طلبات/عملاء/مخزون، Webhooks عامة أو `app.store.authorize`، SEO، تسويق، وكيل ذكاء اصطناعي، تحليلات، Dashboard، أو أي كتابة على متجر. تبدأ في المراحل 04+ وفق [`docs/roadmap.md`](docs/roadmap.md).
+مزامنة طلبات/عملاء/مخزون، Webhooks عامة أو `app.store.authorize`، SEO، تسويق، وكيل ذكاء اصطناعي، تحليلات، Dashboard، أو أي كتابة على متجر. تبدأ في المراحل 05+ وفق [`docs/roadmap.md`](docs/roadmap.md).
 
 ---
 
@@ -66,8 +79,8 @@ npm run dev
 
 | الأمر | ماذا يفعل |
 |---|---|
-| `npm test` | 106 اختبار وحدة (كلمات مرور، رموز، صلاحيات، تشفير، حالة OAuth، صلاحية الرموز، إعداد Salla) |
-| `npm run test:integration` | 62 اختبار تكامل/أمن على **PostgreSQL حقيقي** (منها 30 لـ Salla بمحاكي OAuth محلي) |
+| `npm test` | 146 اختبار وحدة (كلمات مرور، رموز، صلاحيات، تشفير، حالة OAuth، صلاحية الرموز، إعداد Salla، DTO، مappers، ترقيم، إعادة محاولة) |
+| `npm run test:integration` | 88 اختبار تكامل/أمن على **PostgreSQL حقيقي** (منها 54 لـ Salla بمحاكي بروتوكول محلي) |
 | `npm run verify` | تنسيق + lint + أنواع + كل الاختبارات + فحص الأسرار + بناء إنتاجي |
 
 `test:integration` يشغّل PostgreSQL 18 محليًا على المنفذ `55432` في `.pgdata-test/` (مُستثنى من Git)، وينشئ دورًا غير مالك `ksh_app` حتى تُفرض سياسات RLS فعليًا. في CI يُستخدم خدمة `postgres:16` عبر `TEST_DATABASE_URL`.
@@ -94,12 +107,13 @@ src/
 │   ├── identity/        # scrypt, tokens, permissions, auth-service
 │   ├── organizations/   # memberships, invitations
 │   ├── stores/          # internal store records
+│   ├── catalog/         # DTO, mappers, repositories, read + sync services
 │   ├── integrations/    # Salla: domain / application / infrastructure
 │   └── audit/           # append-only audit log
 ├── server/              # CSRF, rate limit, session, API envelope
 └── test/                # embedded PostgreSQL harness + integration tests
-drizzle/                 # 0000_init, 0001_rls, 0002_store_connections, 0003_salla_rls
-docs/                    # architecture, product-spec, roadmap, decisions, salla-reference, phase-02, phase-03
+drizzle/                 # 0000_init … 0005_catalog_rls (6 migrations)
+docs/                    # architecture, product-spec, roadmap, decisions, salla-reference, phase-02…04
 ```
 
 ## الوثائق
@@ -107,9 +121,10 @@ docs/                    # architecture, product-spec, roadmap, decisions, salla
 - [`docs/architecture.md`](docs/architecture.md) — المعمارية الكاملة (مصدر الحقيقة).
 - [`docs/product-spec.md`](docs/product-spec.md) — تعريف المنتج.
 - [`docs/roadmap.md`](docs/roadmap.md) — 25 مرحلة وبوابات G1–G5.
-- [`docs/decisions.md`](docs/decisions.md) — 37 قرارًا معماريًا بالسبب والبدائل.
+- [`docs/decisions.md`](docs/decisions.md) — 40 قرارًا معماريًا بالسبب والبدائل.
 - [`docs/salla-reference.md`](docs/salla-reference.md) — حقائق Salla الموثّقة فقط.
 - [`docs/phase-03.md`](docs/phase-03.md) — تنفيذ Phase 03: وضع OAuth، الرموز، القفل، الاختبارات، القيود.
+- [`docs/phase-04.md`](docs/phase-04.md) — تنفيذ Phase 04: نموذج الكتالوج، المزامنة، الترقيم، القفل، الواجهة، الاختبارات.
 - [`docs/phase-02.md`](docs/phase-02.md) — خطة Phase 02 وملاحظات التنفيذ.
 
 ## السكربتات

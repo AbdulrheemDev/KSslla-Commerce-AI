@@ -2,12 +2,12 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 
 /**
- * Protocol-level mock of the Salla OAuth endpoints.
+ * Protocol-level mock of the Salla endpoints used by Phases 03–04.
  *
  * Tests never contact Salla. The mock implements the documented behaviour that
- * matters for Phase 03: form-urlencoded token requests, `invalid_grant` on a
- * spent or unknown grant, refresh-token rotation with reuse detection, and the
- * `user/info` payload shape.
+ * matters here: form-urlencoded token requests, `invalid_grant` on a spent or
+ * unknown grant, refresh-token rotation with reuse detection, the `user/info`
+ * payload, and paginated catalogue listings with documented envelope shape.
  */
 
 export interface MockToken {
@@ -18,6 +18,32 @@ export interface MockToken {
   scope: string;
 }
 
+export interface MockProduct {
+  id: number | string;
+  name: string;
+  sku?: string | null;
+  type?: string;
+  status: string;
+  description?: string;
+  price?: { amount: number | string; currency: string };
+  regular_price?: { amount: number | string; currency: string };
+  sale_price?: Record<string, never>;
+  quantity?: number | string;
+  is_available?: boolean;
+  updated_at?: string;
+  categories?: Array<{ id: number | string }>;
+  main_image?: string;
+}
+
+export interface MockCategory {
+  id: number | string;
+  name: string;
+  parent_id?: number | string;
+  status: string;
+  sort_order?: number;
+  update_at?: string;
+}
+
 export interface MockSallaBehaviour {
   /** Reject the next authorization_code exchange with this error code. */
   authorizationCodeError?: string | null;
@@ -25,12 +51,31 @@ export interface MockSallaBehaviour {
   failTokenRequests?: boolean;
   /** Reject user-info calls. */
   failUserInfo?: boolean;
+  /** HTTP status returned for catalogue requests, if set. */
+  catalogStatus?: number | null;
+  /** Number of catalogue requests that fail with `catalogStatus` before succeeding. */
+  catalogFailuresRemaining?: number;
+  /** Status used for the first `catalogFailuresRemaining` requests. */
+  catalogFailureStatus?: number | null;
+  /** Value of the Retry-After header sent with a failing catalogue request. */
+  catalogRetryAfter?: number | null;
+  /** Return a body that does not match the documented envelope. */
+  catalogMalformed?: boolean;
+  /** Return page 1 data for every requested page. */
+  catalogRepeatPage?: boolean;
+  /** Delay before answering a catalogue request (lets concurrency tests overlap). */
+  catalogDelayMs?: number;
+  /** Reject every refresh_token grant with invalid_grant. */
+  rejectRefresh?: boolean;
+  /** Fail catalogue requests from this 1-based request number onward. */
+  catalogFailFrom?: number | null;
 }
 
 export interface RecordedRequest {
   method: string;
   path: string;
   form: Record<string, string>;
+  query: Record<string, string>;
 }
 
 export class MockSallaServer {
@@ -46,10 +91,16 @@ export class MockSallaServer {
   readonly revokedRefreshTokens = new Set<string>();
   readonly validAccessTokens = new Set<string>();
 
+  private catalogRequestSeq = 0;
+
+  products: MockProduct[] = [];
+  categories: MockCategory[] = [];
+  productPageSize = 30;
+
   merchantId = "847769313";
   userId = "1689171978";
   merchantName = "متجر تجريبي";
-  scope = "offline_access";
+  scope = "offline_access products.read categories.read";
 
   get url(): string {
     return this.baseUrl;
@@ -63,13 +114,15 @@ export class MockSallaServer {
       req.on("data", (chunk: Buffer) => chunks.push(chunk));
       req.on("end", () => {
         const raw = Buffer.concat(chunks).toString("utf8");
-        const path = new URL(req.url ?? "/", "http://localhost").pathname;
+        const parsed = new URL(req.url ?? "/", "http://localhost");
+        const path = parsed.pathname;
         const form = Object.fromEntries(new URLSearchParams(raw).entries());
+        const query = Object.fromEntries(parsed.searchParams.entries());
 
-        this.requests.push({ method: req.method ?? "GET", path, form });
+        this.requests.push({ method: req.method ?? "GET", path, form, query });
 
-        const send = (status: number, body: unknown) => {
-          res.writeHead(status, { "content-type": "application/json" });
+        const send = (status: number, body: unknown, headers: Record<string, string> = {}) => {
+          res.writeHead(status, { "content-type": "application/json", ...headers });
           res.end(JSON.stringify(body));
         };
 
@@ -87,9 +140,7 @@ export class MockSallaServer {
             send(500, { error: "server_error" });
             return;
           }
-          const auth = req.headers.authorization ?? "";
-          const token = auth.replace(/^Bearer\s+/i, "");
-          if (!this.validAccessTokens.has(token)) {
+          if (!this.accessTokenFrom(req)) {
             send(401, { error: "unauthenticated" });
             return;
           }
@@ -111,6 +162,16 @@ export class MockSallaServer {
               },
             },
           });
+          return;
+        }
+
+        if (path === "/admin/v2/products" || path === "/admin/v2/categories") {
+          const answer = () => this.handleCatalog(req, query, path.endsWith("products"), send);
+          if (this.behaviour.catalogDelayMs && this.behaviour.catalogDelayMs > 0) {
+            setTimeout(answer, this.behaviour.catalogDelayMs);
+          } else {
+            answer();
+          }
           return;
         }
 
@@ -140,9 +201,105 @@ export class MockSallaServer {
     this.behaviour.authorizationCodeError = null;
     this.behaviour.failTokenRequests = false;
     this.behaviour.failUserInfo = false;
+    this.behaviour.catalogStatus = null;
+    this.behaviour.catalogFailureStatus = null;
+    this.behaviour.catalogFailuresRemaining = 0;
+    this.behaviour.catalogRetryAfter = null;
+    this.behaviour.catalogMalformed = false;
+    this.behaviour.catalogRepeatPage = false;
+    this.behaviour.catalogDelayMs = 0;
+    this.behaviour.rejectRefresh = false;
+    this.behaviour.catalogFailFrom = null;
+    this.catalogRequestSeq = 0;
     this.merchantId = "847769313";
     this.userId = "1689171978";
     this.merchantName = "متجر تجريبي";
+    this.products = [];
+    this.categories = [];
+  }
+
+  invalidateAccessTokens(): void {
+    this.validAccessTokens.clear();
+  }
+
+  private accessTokenFrom(req: { headers: { authorization?: string } }): string | null {
+    const header = req.headers.authorization ?? "";
+    const token = header.replace(/^Bearer\s+/i, "");
+    if (!token || !this.validAccessTokens.has(token)) return null;
+    return token;
+  }
+
+  private handleCatalog(
+    req: { headers: { authorization?: string } },
+    query: Record<string, string>,
+    isProducts: boolean,
+    send: (status: number, body: unknown, headers?: Record<string, string>) => void,
+  ): void {
+    if (!this.accessTokenFrom(req)) {
+      send(401, {
+        status: 401,
+        success: false,
+        error: { code: "Unauthorized", message: "The access token is invalid" },
+      });
+      return;
+    }
+
+    this.catalogRequestSeq += 1;
+
+    const fail = (status: number) => {
+      const headers: Record<string, string> =
+        this.behaviour.catalogRetryAfter !== null && this.behaviour.catalogRetryAfter !== undefined
+          ? { "retry-after": String(this.behaviour.catalogRetryAfter) }
+          : {};
+      send(
+        status,
+        { status, success: false, error: { code: "error", message: "forced" } },
+        headers,
+      );
+    };
+
+    if (this.behaviour.catalogFailFrom !== null && this.behaviour.catalogFailFrom !== undefined) {
+      if (this.catalogRequestSeq >= this.behaviour.catalogFailFrom) {
+        fail(this.behaviour.catalogStatus ?? 500);
+        return;
+      }
+    } else if (
+      this.behaviour.catalogFailuresRemaining &&
+      this.behaviour.catalogFailuresRemaining > 0
+    ) {
+      this.behaviour.catalogFailuresRemaining -= 1;
+      fail(this.behaviour.catalogFailureStatus ?? this.behaviour.catalogStatus ?? 500);
+      return;
+    } else if (this.behaviour.catalogStatus) {
+      fail(this.behaviour.catalogStatus);
+      return;
+    }
+
+    if (this.behaviour.catalogMalformed) {
+      send(200, { status: 200, success: true, data: "not-an-array" });
+      return;
+    }
+
+    const page = Math.max(1, Number(query.page ?? "1") || 1);
+    const perPage = Math.min(60, Math.max(1, Number(query.per_page ?? this.productPageSize) || 30));
+    const source = isProducts ? this.products : this.categories;
+    const totalPages = Math.max(1, Math.ceil(source.length / perPage));
+    const effectivePage = this.behaviour.catalogRepeatPage ? 1 : page;
+    const slice = source.slice((effectivePage - 1) * perPage, effectivePage * perPage);
+
+    send(200, {
+      status: 200,
+      success: true,
+      data: slice,
+      pagination: {
+        count: slice.length,
+        total: source.length,
+        perPage,
+        currentPage: page,
+        totalPages,
+        links: [],
+      },
+    });
   }
 
   private issueToken(refreshToken: string | null): MockToken {
@@ -195,6 +352,14 @@ export class MockSallaServer {
     if (grant === "refresh_token") {
       const presented = form.refresh_token ?? "";
 
+      if (this.behaviour.rejectRefresh) {
+        send(401, {
+          error: "invalid_grant",
+          error_description: "The provided authorization grant is invalid, expired, or revoked.",
+        });
+        return;
+      }
+
       if (
         !presented ||
         this.spentRefreshTokens.has(presented) ||
@@ -236,5 +401,15 @@ export class MockSallaServer {
     return this.requests.filter(
       (request) => request.path === "/oauth2/token" && request.form.grant_type === "refresh_token",
     ).length;
+  }
+
+  catalogRequestCount(resource: "products" | "categories"): number {
+    return this.requests.filter((request) => request.path.endsWith(`/admin/v2/${resource}`)).length;
+  }
+
+  cataloguePages(resource: "products" | "categories"): number[] {
+    return this.requests
+      .filter((request) => request.path.endsWith(`/admin/v2/${resource}`))
+      .map((request) => Number(request.query.page ?? "1"));
   }
 }

@@ -29,6 +29,20 @@
       "when": 1792623856909,
       "tag": "0003_salla_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792627013693,
+      "tag": "0004_products_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792627023433,
+      "tag": "0005_catalog_rls",
+      "breakpoints": true
     }
   ]
 }
