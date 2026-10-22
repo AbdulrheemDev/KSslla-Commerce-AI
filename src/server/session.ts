@@ -11,6 +11,7 @@ import { SESSION_COOKIE_NAME } from "@/modules/identity/domain/session-policy";
 import { authenticateSessionToken } from "@/modules/identity/application/auth-service";
 import type { AuthSession, TenantContext } from "@/modules/identity/application/types";
 import { assertPermission, assertRole } from "@/modules/identity/application/authorization";
+import { cookiePolicy } from "@/server/cookie-policy";
 import { requestMeta } from "@/server/request-meta";
 
 /** Reads the session cookie value without trusting anything else. */
@@ -21,20 +22,18 @@ export function readSessionToken(request: NextRequest): string | null {
 export function setSessionCookie(response: NextResponse, token: string, expiresAt: Date): void {
   response.cookies.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: true,
-    sameSite: "lax",
     path: "/",
     expires: expiresAt,
+    ...cookiePolicy(),
   });
 }
 
 export function clearSessionCookie(response: NextResponse): void {
   response.cookies.set(SESSION_COOKIE_NAME, "", {
     httpOnly: true,
-    secure: true,
-    sameSite: "lax",
     path: "/",
     maxAge: 0,
+    ...cookiePolicy(),
   });
 }
 

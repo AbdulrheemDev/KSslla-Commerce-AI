@@ -2,6 +2,7 @@ import type { NextRequest, NextResponse } from "next/server";
 
 import { AppError } from "@/lib/errors";
 import { getServerEnv } from "@/lib/env";
+import { cookiePolicy } from "@/server/cookie-policy";
 import { logger } from "@/lib/logger";
 import { generateOpaqueToken, safeCompare } from "@/modules/identity/domain/tokens";
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from "@/modules/identity/domain/session-policy";
@@ -193,9 +194,8 @@ export function issueCsrfToken(response: NextResponse): string {
 export function setCsrfCookie(response: NextResponse, token: string): void {
   response.cookies.set(CSRF_COOKIE_NAME, token, {
     httpOnly: false,
-    secure: true,
-    sameSite: "lax",
     path: "/",
     maxAge: CSRF_COOKIE_MAX_AGE_SECONDS,
+    ...cookiePolicy(),
   });
 }

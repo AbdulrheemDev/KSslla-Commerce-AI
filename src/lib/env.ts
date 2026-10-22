@@ -18,53 +18,71 @@ export const LOG_LEVELS = ["fatal", "error", "warn", "info", "debug", "trace", "
 
 const optionalText = z.string().trim().min(1).optional();
 
-export const serverEnvSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+export const serverEnvSchema = z
+  .object({
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
-  // Phase 01 — application
-  APP_URL: z.url({ protocol: /^https?$/ }).default("http://localhost:3000"),
-  LOG_LEVEL: z.enum(LOG_LEVELS).default("info"),
+    // Phase 01 — application
+    APP_URL: z.url({ protocol: /^https?$/ }).default("http://localhost:3000"),
+    LOG_LEVEL: z.enum(LOG_LEVELS).default("info"),
 
-  // Phase 02 — persistence and sessions
-  DATABASE_URL: optionalText,
-  MIGRATION_DATABASE_URL: optionalText,
-  AUTH_SECRET: z.string().min(32, "AUTH_SECRET must be at least 32 characters.").optional(),
-  ENCRYPTION_KEY: z
-    .string()
-    .regex(
-      /^[0-9a-fA-F]{64}$/,
-      "ENCRYPTION_KEY must be 32 bytes encoded as 64 hexadecimal characters.",
-    )
-    .optional(),
+    // Phase 02 — persistence and sessions
+    DATABASE_URL: optionalText,
+    MIGRATION_DATABASE_URL: optionalText,
+    AUTH_SECRET: z.string().min(32, "AUTH_SECRET must be at least 32 characters.").optional(),
+    ENCRYPTION_KEY: z
+      .string()
+      .regex(
+        /^[0-9a-fA-F]{64}$/,
+        "ENCRYPTION_KEY must be 32 bytes encoded as 64 hexadecimal characters.",
+      )
+      .optional(),
 
-  // Phase 03 — Salla app (server-only)
-  SALLA_CLIENT_ID: optionalText,
-  SALLA_CLIENT_SECRET: optionalText,
-  SALLA_REDIRECT_URI: z.url({ protocol: /^https?$/ }).optional(),
-  SALLA_OAUTH_MODE: z.enum(["custom", "easy"]).default("custom"),
-  // Development/test only. Rejected in production by the Salla config layer.
-  SALLA_API_URL: z.url({ protocol: /^https?$/ }).optional(),
-  SALLA_AUTH_URL: z.url({ protocol: /^https?$/ }).optional(),
-  SALLA_TOKEN_URL: z.url({ protocol: /^https?$/ }).optional(),
-  SALLA_USERINFO_URL: z.url({ protocol: /^https?$/ }).optional(),
+    // Phase 03 — Salla app (server-only)
+    SALLA_CLIENT_ID: optionalText,
+    SALLA_CLIENT_SECRET: optionalText,
+    SALLA_REDIRECT_URI: z.url({ protocol: /^https?$/ }).optional(),
+    SALLA_OAUTH_MODE: z.enum(["custom", "easy"]).default("custom"),
+    // Development/test only. Rejected in production by the Salla config layer.
+    SALLA_API_URL: z.url({ protocol: /^https?$/ }).optional(),
+    SALLA_AUTH_URL: z.url({ protocol: /^https?$/ }).optional(),
+    SALLA_TOKEN_URL: z.url({ protocol: /^https?$/ }).optional(),
+    SALLA_USERINFO_URL: z.url({ protocol: /^https?$/ }).optional(),
 
-  // Phase 06 — Salla webhooks
-  SALLA_WEBHOOK_SECRET: optionalText,
-  /**
-   * Bearer token for the internal worker drain endpoint, which pumps retries
-   * between deliveries. Unset disables the endpoint entirely (404).
-   */
-  WEBHOOK_WORKER_TOKEN: z
-    .string()
-    .trim()
-    .min(16, "WEBHOOK_WORKER_TOKEN must be at least 16 characters.")
-    .optional(),
+    // Phase 06 — Salla webhooks
+    SALLA_WEBHOOK_SECRET: optionalText,
+    /**
+     * Bearer token for the internal worker drain endpoint, which pumps retries
+     * between deliveries. Unset disables the endpoint entirely (404).
+     */
+    WEBHOOK_WORKER_TOKEN: z
+      .string()
+      .trim()
+      .min(16, "WEBHOOK_WORKER_TOKEN must be at least 16 characters.")
+      .optional(),
 
-  // Phase 14 — AI provider
-  AI_PROVIDER: optionalText,
-  AI_API_KEY: optionalText,
-  AI_DEFAULT_MODEL: optionalText,
-});
+    /**
+     * Development/preview only. When set to `partitioned`, the CSRF and session
+     * cookies are issued as `SameSite=None; Secure; Partitioned` (CHIPS) so the
+     * app keeps a session inside a cross-site preview iframe, where browsers
+     * reject ordinary third-party cookies. Rejected in production below.
+     */
+    PREVIEW_EMBEDDED_COOKIES: z.enum(["partitioned"]).optional(),
+
+    // Phase 14 — AI provider
+    AI_PROVIDER: optionalText,
+    AI_API_KEY: optionalText,
+    AI_DEFAULT_MODEL: optionalText,
+  })
+  .superRefine((env, ctx) => {
+    if (env.NODE_ENV === "production" && env.PREVIEW_EMBEDDED_COOKIES) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["PREVIEW_EMBEDDED_COOKIES"],
+        message: "PREVIEW_EMBEDDED_COOKIES is only allowed outside production.",
+      });
+    }
+  });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 
