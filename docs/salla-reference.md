@@ -944,3 +944,27 @@ offline_access
 - **الدليل 2** يمنع ادّعاء «معدل بيع»؛ لا يُستخدم `sold_quantity` في أي قسمة على أيام.
 - **الدليل 6** يمنع تسمية أي طلب «مرتجعًا»؛ ويُسجَّل كسؤال مفتوح في `docs/phase-07.md` §12.
 - **الدليل 10** لا يتعارض مع §12.1 (الذي يذكر `date.timezone` لكل طلب): المنطقتان تُحفظان لكل طلب، لكن التجميع عبر نافذة واحدة يحتاج حدًّا موحّدًا، وUTC هو الوحيد المتماثل لكل الطلبات.
+
+---
+
+## 16. سجل أدلة Phase 08 — ذكاء المبيعات
+
+> **تاريخ التحقق:** 2026-10-22. **المصادر:** صفحة `List Orders` المعتمدة في §12، وصفحة `Order Details`، وصفحة حالات الطلب في §15.
+> هذه المرحلة **لا تنادي Salla إطلاقًا**. الغرض من هذا القسم هو تثبيت حدود ما يمكن قوله عن المال، وتوثيق **غياب** بيانات الخصم والضريبة والمرتجع بدلًا من استنتاجها.
+
+| # | Claim | Source | URL | Verified At | Implementation Impact |
+|---|---|---|---|---|---|
+| 1 | استجابة `List Orders` تحمل `total { amount, currency }` فقط؛ لا `sub_total` ولا `discounts` ولا `tax` ولا `shipping_cost` في مستوى القائمة | Salla Docs — List Orders (مخطط الاستجابة) | https://docs.salla.dev/5394146e0 | 2026-10-22 | كل مال هذه المرحلة = `orders.total_amount` كما وصل. لا تُحسب ضريبة ولا شحن ولا خصم على مستوى القائمة |
+| 2 | `coupon` في `List Orders` **معامل تصفية** لا حقل بيانات؛ ولا تُرجع الاستجابة كود الكوبون أو قيمته | Salla Docs — List Orders (Query Params) | https://docs.salla.dev/5394146e0 | 2026-10-22 | لا يُستخدم كود الكوبون كمصدر خصم، ولا يُستدل من وجوده على قيمة مخصومة |
+| 3 | `amounts.discounts[]` موثّق في `Order Details` فقط: `{title, type, code, discount, currency, discounted_shipping, hasMarketing}` | Salla Docs — Order Details | https://docs.salla.dev/orders/details | 2026-10-22 | المصدر الوحيد الممكن للخصم هو نداء تفاصيل لكل طلب؛ لم يُضف في هذه المرحلة (قرار §16.1) |
+| 4 | مثال الاستجابة الكامل في `Order Details` موسوم صراحةً **Full Details - Deprecated**، مع بقاء النقطة نفسها (`GET /admin/v2/orders/{id}`, `orders.read`) وثيقة | Salla Docs — Order Details | https://docs.salla.dev/orders/details | 2026-10-22 | لا يُبنى تخزين جديد على شكل استجابة موسوم بالإهمال دون قرار مالك صريح |
+| 5 | الضريبة تظهر فقط داخل `amounts.tax { percent, amount }` في تفاصيل الطلب، وليست في القائمة | Salla Docs — Order Details | https://docs.salla.dev/orders/details | 2026-10-22 | لا مقياس ضريبة، ولا ادّعاء أن الإيراد «قبل/بعد الضريبة»؛ الإيراد هو إجمالي الطلب المُعاد |
+| 6 | المرتجع ليس حالة طلب؛ يظهر كـ`payment_actions.refund_action { paid_amount, refund_amount, refunded_transactions, pending_refund_amount, has_refund_amount }` داخل التفاصيل | Salla Docs — Order Details + List Order Statuses | https://docs.salla.dev/orders/details | 2026-10-22 | لا مقياس مرتجعات، ولا «صافي مبيعات». الإيراد المعتمد ليس صافيًا من الاسترداد — مذكور في الواجهة والتوثيق |
+
+### 16.1 القرار المترتب: لا خصومات في هذه المرحلة
+
+- جدول `orders` لا يحمل أي عمود خصم، و`List Orders` لا يُرجع خصمًا، و`Order Details` لم يُخزَّن.
+- اشتقاق خصم من `total` بطرح «سعر» مُخترع = اختلاق رقم. ومقارنة `coupon` بلا قيمة = اختلاق نسبة.
+- لذلك: `discounts.available = false`، وكل مقاييس الخصم `unavailable("discount_not_mirrored")`، مع ذكر المصدرين (`usedEndpoint` و`documentedIn`) في الحمولة والواجهة.
+- **التوسيع الممكن** (يحتاج موافقة المالك): تخزين `amounts.discounts[]` عبر نداء تفاصيل لكل طلب + أعمدة خصم في جدول منفصل. التكلفة: N نداءات لكل مزامنة وضغط على حدّ المعدل، وشكل استجابة موسوم بالإهمال.
+- **بديل مرفوض**: نداء تفاصيل عند كل طلب في كل تحليل — يخالف §17 (لا N+1) ويحوّل قراءةً إلى سلسلة نداءات خارجية.

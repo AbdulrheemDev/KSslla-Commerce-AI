@@ -201,7 +201,8 @@ src/
     identity/
       domain/ application/ infrastructure/ ui/
     commerce/
-    intelligence/
+    intelligence/            # Phase 07 — قراءة محسوبة من النسخة المحلية
+    sales-intelligence/      # Phase 08 — مبيعات/اتجاهات/شذوذ/تصدير، بلا AI
     growth/
     seo/
     competitors/
