@@ -107,7 +107,12 @@ describe("Salla configuration", () => {
     const health = getSallaHealth(env());
     const serialized = JSON.stringify(health);
 
-    expect(health).toEqual({ configured: true, oauthMode: "custom", implemented: true });
+    expect(health).toEqual({
+      configured: true,
+      oauthMode: "custom",
+      implemented: true,
+      simulated: false,
+    });
     expect(serialized).not.toContain(CLIENT_ID);
     expect(serialized).not.toContain(CLIENT_SECRET);
   });

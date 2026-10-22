@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -70,7 +71,13 @@ export function DataSyncControls({
   if (!connected) {
     return (
       <div className="rounded-2xl border border-amber/25 bg-amber/10 px-4 py-3 text-[12.5px] leading-6 text-amber">
-        Salla غير متصل. اربط المتجر أولًا لتتمكن من جلب الطلبات والعملاء والمخزون.
+        <p>Salla غير متصل. اربط المتجر أولًا لتتمكن من جلب الطلبات والعملاء والمخزون.</p>
+        <Link
+          href={`/app/stores/${storeId}`}
+          className="mt-2 inline-flex items-center rounded-lg border border-amber/40 px-3 py-1.5 text-[12px] font-medium text-amber hover:bg-amber/10"
+        >
+          ربط Salla
+        </Link>
       </div>
     );
   }

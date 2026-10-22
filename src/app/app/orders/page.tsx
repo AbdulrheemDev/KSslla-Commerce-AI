@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { CommerceStoreHeader } from "@/components/app/commerce-store-header";
+import { SimulatorNotice } from "@/components/app/simulator-notice";
 import {
   formatCount,
   formatMoney,
@@ -97,6 +98,8 @@ export default async function OrdersPage({
         <Stat label="مسودات" value={formatCount(overview.orders.drafts)} />
         <Stat label="بانتظار الدفع" value={formatCount(overview.orders.pendingPayment)} />
       </section>
+
+      <SimulatorNotice />
 
       <DataSyncControls
         storeId={store.id}

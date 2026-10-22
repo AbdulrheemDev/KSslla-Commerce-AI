@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { CommerceStoreHeader } from "@/components/app/commerce-store-header";
+import { SimulatorNotice } from "@/components/app/simulator-notice";
 import {
   formatCount,
   formatMoney,
@@ -87,6 +88,8 @@ export default async function InventoryPage({
         <Stat label="كمية غير محدودة" value={formatCount(overview.inventory.unlimited)} />
         <Stat label="آخر مزامنة" value={formatWallClock(overview.inventory.lastSyncedAt)} />
       </section>
+
+      <SimulatorNotice />
 
       <DataSyncControls
         storeId={store.id}

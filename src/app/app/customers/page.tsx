@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { CommerceStoreHeader } from "@/components/app/commerce-store-header";
+import { SimulatorNotice } from "@/components/app/simulator-notice";
 import { formatCount, formatDate, Stat, StorePicker } from "@/components/app/commerce-widgets";
 import { DataSyncControls } from "@/components/app/data-sync-controls";
 import { getDb } from "@/db/client";
@@ -92,6 +93,8 @@ export default async function CustomersPage({
           }
         />
       </section>
+
+      <SimulatorNotice />
 
       <DataSyncControls
         storeId={store.id}

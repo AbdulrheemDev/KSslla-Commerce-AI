@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { CommerceDataCard } from "@/components/app/commerce-data-card";
 import { SallaConnectionCard } from "@/components/app/salla-connection-card";
+import { SimulatorNotice } from "@/components/app/simulator-notice";
 import { StatusPill } from "@/components/status-pill";
 import { getDb } from "@/db/client";
 import { getCommerceOverview } from "@/modules/catalog/application/catalog-service";
@@ -149,6 +150,8 @@ export default async function StoreSettingsPage({
           <p className="ltr mt-2 break-all text-[12px] text-muted">{store.id}</p>
         </div>
       </section>
+
+      <SimulatorNotice />
 
       <SallaConnectionCard
         storeId={store.id}

@@ -123,6 +123,21 @@ export interface SallaHealth {
   configured: boolean;
   oauthMode: SallaOAuthMode;
   implemented: boolean;
+  /**
+   * True when the Merchant API base URL is not the documented host, i.e. the
+   * environment points at a local protocol simulator. The UI uses this to
+   * label the data as simulated; the URL itself never leaves the server.
+   */
+  simulated: boolean;
+}
+
+/** Compares hosts only; a trailing path or slash can never flip the answer. */
+function isSimulatedBaseUrl(baseUrl: string): boolean {
+  try {
+    return new URL(baseUrl).hostname !== new URL(SALLA_OFFICIAL_ENDPOINTS.apiBaseUrl).hostname;
+  } catch {
+    return false;
+  }
 }
 
 /** Safe subset for `/api/health`; contains no credential and no tenant data. */
@@ -139,5 +154,6 @@ export function getSallaHealth(env: ServerEnv = getServerEnv()): SallaHealth {
     configured: config !== null,
     oauthMode: env.SALLA_OAUTH_MODE,
     implemented: config?.supported ?? false,
+    simulated: config ? isSimulatedBaseUrl(config.endpoints.apiBaseUrl) : false,
   };
 }
