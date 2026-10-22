@@ -88,16 +88,8 @@ export class ApiClient {
     const request = this.build(path, { method, body: options.body, headers });
     const { dispatch } = await loadHandler(method, path);
 
-    const membershipMatch = path.match(/\/members\/([^/]+)$/);
-    const storeMatch = path.match(/\/stores\/([^/]+)/);
-    const derivedParams: Record<string, string> = membershipMatch
-      ? { membershipId: membershipMatch[1]! }
-      : storeMatch
-        ? { storeId: storeMatch[1]! }
-        : {};
-
     const response = await dispatch(request, {
-      params: Promise.resolve({ ...derivedParams, ...(options.params ?? {}) }),
+      params: Promise.resolve(routeParams(path, options.params)),
     });
 
     this.capture(response);
@@ -108,6 +100,31 @@ export class ApiClient {
 
   get<T>(path: string, options?: { params?: Record<string, string> }) {
     return this.request<T>("GET", path, options);
+  }
+
+  /**
+   * GET a non-JSON body (CSV exports). Kept separate from `request` so the
+   * envelope-typed helper never has to guess a content type.
+   */
+  async getText(
+    path: string,
+    options: { params?: Record<string, string> } = {},
+  ): Promise<{ status: number; text: string; headers: Headers; response: NextResponse }> {
+    const request = this.build(path, { method: "GET" });
+    const { dispatch } = await loadHandler("GET", path);
+
+    const response = await dispatch(request, {
+      params: Promise.resolve(routeParams(path, options.params)),
+    });
+
+    this.capture(response);
+
+    return {
+      status: response.status,
+      text: await response.text(),
+      headers: response.headers,
+      response,
+    };
   }
 
   post<T>(path: string, body?: unknown, headers?: Record<string, string>) {
@@ -121,6 +138,18 @@ export class ApiClient {
   delete<T>(path: string, params?: Record<string, string>) {
     return this.request<T>("DELETE", path, { params });
   }
+}
+
+function routeParams(path: string, extra?: Record<string, string>): Record<string, string> {
+  const membershipMatch = path.match(/\/members\/([^/]+)$/);
+  const storeMatch = path.match(/\/stores\/([^/]+)/);
+  const derived: Record<string, string> = membershipMatch
+    ? { membershipId: membershipMatch[1]! }
+    : storeMatch
+      ? { storeId: storeMatch[1]! }
+      : {};
+
+  return { ...derived, ...(extra ?? {}) };
 }
 
 type Handler = (
@@ -334,6 +363,30 @@ async function loadHandler(
       string,
       unknown
     >;
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
+  const salesIntelligence = normalized.match(
+    /^\/api\/organizations\/current\/stores\/([^/]+)\/sales-intelligence\/(overview|trends|anomalies|discounts|export)$/,
+  );
+  if (salesIntelligence) {
+    const endpoint = salesIntelligence[2]!;
+    const loaders: Record<string, () => Promise<Record<string, unknown>>> = {
+      overview: () =>
+        import("@/app/api/organizations/current/stores/[storeId]/sales-intelligence/overview/route"),
+      trends: () =>
+        import("@/app/api/organizations/current/stores/[storeId]/sales-intelligence/trends/route"),
+      anomalies: () =>
+        import("@/app/api/organizations/current/stores/[storeId]/sales-intelligence/anomalies/route"),
+      discounts: () =>
+        import("@/app/api/organizations/current/stores/[storeId]/sales-intelligence/discounts/route"),
+      export: () =>
+        import("@/app/api/organizations/current/stores/[storeId]/sales-intelligence/export/route"),
+    };
+
+    const handlers = (await loaders[endpoint]!()) as Record<string, unknown>;
     const dispatch = handlers[method] as Handler | undefined;
     if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
     return { dispatch };
