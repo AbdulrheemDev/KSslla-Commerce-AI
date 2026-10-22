@@ -68,6 +68,22 @@ export const REASON_LABELS_AR: Record<string, string> = {
   no_products_in_category: "لا توجد منتجات في هذا التصنيف",
   missing_currency: "لا توجد عملة محفوظة",
 
+  // Phase 10 — inventory intelligence.
+  product_demand_not_linked: "لا يوجد معدل طلب موثّق لكل منتج، فلا تُحسب أيام أو تنبؤ",
+  lead_time_not_configured: "مهلة التوريد غير مضبوطة لهذا المتجر",
+  safety_stock_not_configured: "مخزون الأمان غير مضبوط لهذا المتجر",
+  days_of_stock_unavailable: "الأيام المتبقية تحتاج معدل طلب يوميًا",
+  invalid_days_of_stock: "الأيام المتبقية غير قابلة للحساب من هذه القيم",
+  invalid_demand: "معدل الطلب غير صالح",
+  no_demand_in_window: "لا طلب مسجّل في المدة المحددة",
+  no_inventory_rows: "لم تُحفظ أي صفوف مخزون لهذا المتجر",
+  inventory_entries_unlinked: "سجلات مخزون غير مرتبطة بمنتجات في الكتالوج",
+  products_without_inventory_record: "بعض المنتجات بلا سجل مخزون",
+  inventory_snapshot_stale: "لقطة المخزون أقدم من الحد المعلن",
+  inventory_coverage_partial: "تغطية المخزون جزئية",
+  negative_quantity_present: "توجد كميات سالبة محفوظة",
+  unlimited_stock: "الكمية غير محدودة",
+
   // Phase 08 — sales intelligence.
   outside_history: "خارج السجل المحفوظ",
   history_starts_mid_bucket: "بداية السجل داخل هذه الفترة",
