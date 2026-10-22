@@ -238,6 +238,43 @@ async function loadHandler(
     return { dispatch };
   }
 
+  const dataSync = normalized.match(/^\/api\/organizations\/current\/stores\/([^/]+)\/data\/sync$/);
+  if (dataSync) {
+    const handlers =
+      (await import("@/app/api/organizations/current/stores/[storeId]/data/sync/route")) as Record<
+        string,
+        unknown
+      >;
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
+  const dataResource = normalized.match(
+    /^\/api\/organizations\/current\/stores\/([^/]+)\/data\/(orders|customers|inventory)$/,
+  );
+  if (dataResource) {
+    const resource = dataResource[2]!;
+    const handlers =
+      resource === "orders"
+        ? ((await import("@/app/api/organizations/current/stores/[storeId]/data/orders/route")) as Record<
+            string,
+            unknown
+          >)
+        : resource === "customers"
+          ? ((await import("@/app/api/organizations/current/stores/[storeId]/data/customers/route")) as Record<
+              string,
+              unknown
+            >)
+          : ((await import("@/app/api/organizations/current/stores/[storeId]/data/inventory/route")) as Record<
+              string,
+              unknown
+            >);
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
   if (normalized === "/api/integrations/salla/callback") {
     const handlers = (await import("@/app/api/integrations/salla/callback/route")) as Record<
       string,

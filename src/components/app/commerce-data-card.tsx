@@ -198,6 +198,12 @@ export function CommerceDataCard({
           المنتجات
         </Link>
         <Link
+          href={`/app/orders?store=${storeId}`}
+          className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-[12.5px] text-ink transition-colors hover:border-line-strong"
+        >
+          الطلبات والعملاء والمخزون
+        </Link>
+        <Link
           href={`/app/stores/${storeId}/categories`}
           className="rounded-xl border border-line bg-surface-2 px-4 py-2.5 text-[12.5px] text-ink transition-colors hover:border-line-strong"
         >

@@ -10,7 +10,7 @@ import { getCommerceOverview } from "@/modules/catalog/application/catalog-servi
 import { isAppError } from "@/lib/errors";
 import { getStoreConnection } from "@/modules/integrations/salla/application/connection-service";
 import { getSallaHealth } from "@/modules/integrations/salla/config";
-import { SALLA_CATALOG_SCOPES } from "@/modules/integrations/salla/domain/scopes";
+import { SALLA_REQUIRED_SCOPES } from "@/modules/integrations/salla/domain/scopes";
 import { callbackReasonToMessage } from "@/modules/integrations/salla/domain/messages";
 import { requireStoreAccess } from "@/modules/stores/application/store-service";
 import { requirePageTenant } from "@/server/pages";
@@ -62,7 +62,7 @@ export default async function StoreSettingsPage({
 
   const canConnect = context.permissions.includes("store:connect");
   const canDisconnect = context.permissions.includes("store:disconnect");
-  const missingScopes = SALLA_CATALOG_SCOPES.filter((scope) => !connection.scopes.includes(scope));
+  const missingScopes = SALLA_REQUIRED_SCOPES.filter((scope) => !connection.scopes.includes(scope));
 
   return (
     <div className="space-y-8">
@@ -144,9 +144,12 @@ export default async function StoreSettingsPage({
       <section className="rounded-2xl border border-line bg-surface/40 p-5">
         <h2 className="text-sm font-semibold text-ink">حدود هذه المرحلة</h2>
         <ul className="mt-2 grid list-inside list-disc gap-1 text-[12px] leading-6 text-muted">
-          <li>مزامنة المنتجات والتصنيفات فقط — بلا طلبات أو عملاء أو مخزون.</li>
-          <li>قراءة فقط من Salla؛ لا إنشاء أو تعديل أو حذف لأي عنصر.</li>
-          <li>لا Webhooks، ولا تحليلات أو تسويق أو ذكاء اصطناعي.</li>
+          <li>مزامنة للقراءة فقط: المنتجات، التصنيفات، العملاء، الطلبات، وكميات المخزون.</li>
+          <li>لا إنشاء أو تعديل أو حذف لأي عنصر في Salla.</li>
+          <li>لا Webhooks، ولا تحليلات أو تسويق أو ذكاء اصطناعي، ولا توقعات مخزون.</li>
+          <li>
+            بنود الطلبات تُحفظ بلا معرّف منتج لأن واجهة Salla الموثّقة لا توفّره في قائمة الطلبات.
+          </li>
         </ul>
       </section>
     </div>

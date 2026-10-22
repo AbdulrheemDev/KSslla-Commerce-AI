@@ -28,6 +28,15 @@ export const AUDIT_ACTIONS = [
   "salla.categories.sync_started",
   "salla.categories.sync_completed",
   "salla.categories.sync_failed",
+  "salla.orders.sync_started",
+  "salla.orders.sync_completed",
+  "salla.orders.sync_failed",
+  "salla.customers.sync_started",
+  "salla.customers.sync_completed",
+  "salla.customers.sync_failed",
+  "salla.inventory.sync_started",
+  "salla.inventory.sync_completed",
+  "salla.inventory.sync_failed",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

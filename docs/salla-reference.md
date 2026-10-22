@@ -587,3 +587,159 @@ offline_access
 - **التعارض:** الوثائق تعرض مصفوفة `categories` داخل المنتج، لكنها قد تكون فارغة، ولا تضمن أن التصنيف مُزامَن بعد.
 - **القرار:** تُقرأ المعرّفات فقط، وتُربط بما هو موجود محليًا؛ الارتباط بمعرّف غير معروف يُتجاهل ويُحصى (`items_skipped`) بدل إنشاء تصنيف وهمي.
 - **الأثر:** ترتيب Categories → Products إلزامي، وأي تصنيف مفقود يظهر في عدّاد لا في بيانات مخترعة.
+
+---
+
+## 12. سجل أدلة Phase 05 — الطلبات والعملاء والمخزون
+
+> **تاريخ التحقق:** 2026-10-22. كل صف أدناه قرأته من الصفحة الرسمية المذكورة في نفس الصف.  
+> ما لم يُقرأ في الوثائق **لم يُنفَّذ**؛ ويُسجَّل في §13 كقيد أو تعارض.
+
+### 12.1 `GET /admin/v2/orders`
+
+| الحقل | القيمة |
+|---|---|
+| **Endpoint** | `GET https://api.salla.dev/admin/v2/orders` |
+| **Purpose** | قراءة قائمة طلبات المتجر لبناء نسخة محلية للقراءة فقط |
+| **HTTP Method** | `GET` |
+| **Required Scope** | `orders.read` (Orders Read Only) |
+| **Authentication** | `Authorization: Bearer <access_token>` من `SallaTokenManager` — لا عميل جديد ولا تخزين رمز جديد |
+| **Pagination** | `page` + `per_page`؛ **قراءة متسلسلة فقط**: الصفحة التالية بعد السابقة، وطلب صفحة خارج التسلسل يعيد استجابة **فارغة**. يجب إكمال كل الصفحات داخل نافذة **15 دقيقة** المخزّنة مؤقتًا |
+| **Response Shape** | `{ status: 200, success: true, data: Order[], pagination: { count, total, perPage, currentPage, totalPages, links: { next } } }` |
+| **Rate Limit Considerations** | خطة المتجر (Plus 120 / Pro 360 / Special 720 في الدقيقة)؛ `X-RateLimit-Limit/Remaining/Reset` و`Retry-After`؛ لا طلبات متوازية |
+| **Source** | Salla Docs — List Orders |
+| **URL** | https://docs.salla.dev/5394146e0 |
+| **Verified At** | 2026-10-22 |
+| **Implementation Notes** | نرسل `page`, `per_page=30` فقط، و`from_date`/`to_date` عند تضييق النطاق. **لا نرسل `expanded=true`** (غير مدعوم للتطبيقات المنشأة بعد 2024-08-15، ومزال من 2026-09-01). الحقول المقروءة: `id, external_reference_id, reference_id, total{amount,currency}, date{date,timezone}, source, status{id,name,slug}, draft, payment_method, is_pending_payment, items[name,quantity,thumbnail], customer{...}`. `customer.groups` مهجور (2026-02-18) ولا يُقرأ |
+
+**معاملات الاستعلام الموثّقة (لم نستخدمها كلها):** `keyword, payment_method, status, from_date, to_date, country, city, product, branch, tags, expanded, page, reference_id, coupon, customer_id, shipping_app_id, source, sort_by, accounting_services, unread, assign_employee, selling_channel, created_by`.
+نستخدم فقط: `page`, `per_page`, واختياريًا `from_date`/`to_date`. الباقي غير مستخدم لأنه لا توجد حاجة منتج له بعد (ولا يُرسل معامل غير موثّق).
+
+### 12.2 شكل سطر الطلب في `List Orders` (قيد موثّق)
+
+| الحقل | القيمة |
+|---|---|
+| **Claim** | سطر الطلب في استجابة القائمة يحمل `name`, `quantity`, `thumbnail` فقط — **بلا** معرّف منتج أو SKU أو سعر سطر أو سعر وحدة |
+| **Source** | Salla Docs — List Orders (مخطط `items`) |
+| **URL** | https://docs.salla.dev/5394146e0 |
+| **Verified At** | 2026-10-22 |
+| **Implementation Impact** | `order_items.external_product_id/sku_id/sku/unit_price/total_price` تبقى `NULL`، وتُسجَّل `link_status = 'no_product_reference'`. لا مطابقة بالاسم، ولا إنشاء منتجات وهمية. تفاصيل القرار: ADR-043 |
+
+### 12.3 `GET /admin/v2/customers`
+
+| الحقل | القيمة |
+|---|---|
+| **Endpoint** | `GET https://api.salla.dev/admin/v2/customers` |
+| **Purpose** | قراءة قائمة العملاء لبناء نسخة محلية للقراءة فقط |
+| **HTTP Method** | `GET` |
+| **Required Scope** | `customers.read` (Customers Read Only) |
+| **Authentication** | `Authorization: Bearer <access_token>` |
+| **Pagination** | `page` + `per_page`؛ الاستجابة تحمل `pagination` (`perPage` الافتراضي **15** و`per_page` قابل للتغيير حسب صفحة Pagination العامة) |
+| **Response Shape** | `{ status, success, data: Customer[], pagination: { count, total, perPage, currentPage, totalPages, links: [] } }` |
+| **Rate Limit Considerations** | **حد خاص موثّق: 500 طلب لكل 10 دقائق** للمتجر، إضافة إلى حد الخطة |
+| **Source** | Salla Docs — List Customers |
+| **URL** | https://docs.salla.dev/5394121e0 |
+| **Verified At** | 2026-10-22 |
+| **Implementation Notes** | الحقول المقروءة: `id, first_name, last_name, mobile{number,mobile_code}, mobile_code, email, gender, birthday{date}, city, country, country_code, currency, lang, type, created_at, updated_at`. القائمة **لا تعيد** `created_at` ولا `full_name`؛ يُملأ `created_at` فقط إن جاء من كائن العميل داخل الطلب. لا تُحفظ `urls`/`avatar`/`location`/`groups` |
+
+### 12.4 `GET /admin/v2/customers/{id}`
+
+| الحقل | القيمة |
+|---|---|
+| **Endpoint** | `GET https://api.salla.dev/admin/v2/customers/{id}` |
+| **Purpose** | قراءة عميل واحد — **غير مستخدم في Phase 05** (القائمة تكفي، والنداء لكل عميل يضاعف استهلاك الحد) |
+| **HTTP Method** | `GET` |
+| **Required Scope** | `customers.read` |
+| **Authentication** | `Authorization: Bearer <access_token>` |
+| **Pagination** | لا ينطبق (عنصر واحد) |
+| **Response Shape** | `{ status, success, data: Customer }` |
+| **Rate Limit Considerations** | نفس حد العملاء 500/10 دقائق |
+| **Source** | Salla Docs — Customer Details |
+| **URL** | https://docs.salla.dev/5394122e0 |
+| **Verified At** | 2026-10-22 |
+| **Implementation Notes** | موثّق أنه يعيد `country_code` (مثال `"sa"`) و`location` و`groups`، ولا يعيد `created_at` أيضًا. لم يُستخدم لأن `N` نداءات لا تُبرَّر بلا حقل إضافي نحتاجه |
+
+### 12.5 `GET /admin/v2/products/quantities`
+
+| الحقل | القيمة |
+|---|---|
+| **Endpoint** | `GET https://api.salla.dev/admin/v2/products/quantities` |
+| **Purpose** | قراءة الحالة الحالية لكميات المنتجات/المتغيّرات |
+| **HTTP Method** | `GET` |
+| **Required Scope** | `products.read` (Products Read Only) — لا سكوب مخزون منفصل |
+| **Authentication** | `Authorization: Bearer <access_token>` |
+| **Pagination** | **نقطة مُصفَّحة**: تحمل كتلة `pagination` (`perPage` افتراضي 15، `total`, `totalPages`)، وتقبل `page` و`per_page` كبقية نقاط القوائم |
+| **Response Shape** | `{ status: 200, success: true, data: Quantity[], pagination: {...} }` |
+| **Rate Limit Considerations** | حد الخطة؛ `Retry-After` عند 429 |
+| **Source** | Salla Docs — List Product Quantities |
+| **URL** | https://docs.salla.dev/9612796e0 |
+| **Verified At** | 2026-10-22 |
+| **Implementation Notes** | الحقول: `id, name, image, sku_id, sku, quantity, sold_quantity, price, unlimited_quantity, variant`. `price` يصل **رقمًا أو نصًا** (`127` و`"127.00"` في نفس المثال). `sku_id = null` لمنتج بلا متغيّرات، ويتكرر نفس `id` مرة لكل متغيّر. معاملات موثّقة إضافية غير مستخدمة: `keyword, categories[], brands[], tags[], branch` |
+
+### 12.6 الفرق بين نظامي الترقيم
+
+| المورد | القاعدة الموثّقة | تنفيذنا |
+|---|---|---|
+| Orders | تسلسلي فقط؛ خارج التسلسل ⇒ استجابة فارغة؛ إكمال كل الصفحات خلال 15 دقيقة | صفحة 1 ثم 2 ثم 3… دون قفز؛ مهلة النافذة تُوقف التشغيل (`sequential_window_exceeded`) |
+| Customers | `page`/`per_page` عادي، `perPage` افتراضي 15 | صفحة 1..N حسب `currentPage`/`totalPages`؛ `per_page=30` |
+| Quantities | `page`/`per_page` عادي، `perPage` افتراضي 15 | نفس المسار؛ `per_page=30` |
+
+المصدر العام: https://docs.salla.dev/pagination («maximum value for the `per_page` query parameter is `60`»). لا نفترض قاعدة Orders لأي مورد آخر.
+
+### 12.7 Scopes المطلوبة بعد Phase 05
+
+| Scope | يستخدمه | الحالة |
+|---|---|---|
+| `offline_access` | refresh token | مطلوب منذ Phase 03 |
+| `products.read` | `GET /products` و`GET /products/quantities` | مطلوب منذ Phase 04 |
+| `categories.read` | `GET /categories` | مطلوب منذ Phase 04 |
+| `orders.read` | `GET /orders` | **جديد في Phase 05** |
+| `customers.read` | `GET /customers` | **جديد في Phase 05** |
+
+لا سكوب كتابة واحد. أي اتصال قديم لا يحمل السكوبين الجديدين يعطي `missing_scope` ويحتاج إعادة ربط واحدة (ADR-042).
+
+### 12.8 سجل أدلة Phase 05 (Claim / Source / URL / Verified At / Impact)
+
+| # | Claim | Source | URL | Verified At | Implementation Impact |
+|---|---|---|---|---|---|
+| 1 | `GET /admin/v2/orders` يتطلب `orders.read` | Salla Docs — List Orders | https://docs.salla.dev/5394146e0 | 2026-10-22 | `SALLA_ORDER_SCOPES = ["orders.read"]`؛ يُفحص قبل التشغيل ويُعيد `missing_scope` |
+| 2 | قراءة الطلبات **متسلسلة فقط**، وطلب صفحة خارج التسلسل يعيد استجابة فارغة | List Orders (ملاحظة Pagination) | https://docs.salla.dev/5394146e0 | 2026-10-22 | المشغّل لا يقفز صفحات أبدًا؛ صفحة فارغة قبل الأخيرة تُفشل التشغيل (`pagination.empty`) بدل تخطّي بيانات |
+| 3 | يجب إكمال ترقيم الطلبات خلال **15 دقيقة** | List Orders | https://docs.salla.dev/5394146e0 | 2026-10-22 | `SEQUENTIAL_WINDOW_MS = 15 * 60 * 1000` حول مورد الطلبات فقط |
+| 4 | `expanded=true` غير مدعوم للتطبيقات المنشأة بعد 2024-08-15 ومزال من 2026-09-01 | List Orders + Order Details | https://docs.salla.dev/5394146e0 | 2026-10-22 | العميل لا يرسل `expanded` إطلاقًا؛ اختبار تكاملي يؤكد غيابه من كل طلب |
+| 5 | `per_page` الأقصى الموثّق 60 | Salla Docs — Pagination | https://docs.salla.dev/pagination | 2026-10-22 | نستخدم 30 لكل الموارد الخمسة |
+| 6 | سطر الطلب في القائمة = `name, quantity, thumbnail` فقط | List Orders | https://docs.salla.dev/5394146e0 | 2026-10-22 | أعمدة السعر/SKU/المنتج تبقى `NULL` مع `link_status = no_product_reference` (ADR-043) |
+| 7 | استجابة Order Details الافتراضية `format=light` تُسقط Items، والاستجابة الموسّعة القديمة غير مدعومة منذ 2026-09-01 | Order Details | https://docs.salla.dev/orders/details | 2026-10-22 | لا نستخدم Order Details لجلب البنود؛ ولا نضيف نداءً لكل طلب بلا فائدة موثّقة |
+| 8 | `GET /admin/v2/customers` يتطلب `customers.read` | List Customers | https://docs.salla.dev/5394121e0 | 2026-10-22 | `SALLA_CUSTOMER_SCOPES = ["customers.read"]` |
+| 9 | حد نقاط العملاء **500 طلب / 10 دقائق** | Rate Limiting | https://docs.salla.dev/rate-limiting | 2026-10-22 | ترقيم متسلسل بلا توازٍ؛ مزامنة العملاء أولًا في المشغّل لتفادي تكرار النداء |
+| 10 | القائمة لا تعيد `created_at`/`full_name`/`lang`/`currency`/`country_code`/`type` | List Customers | https://docs.salla.dev/5394121e0 | 2026-10-22 | الأعمدة `nullable`؛ تُملأ من كائن العميل داخل الطلب (enrich) فقط، وتظهر «—» بدل اختراع قيمة |
+| 11 | `GET /products/quantities` يتطلب `products.read` ويعيد `pagination` | List Product Quantities | https://docs.salla.dev/9612796e0 | 2026-10-22 | `SALLA_INVENTORY_SCOPES = ["products.read"]`؛ المورد مُصفَّح بالكامل |
+| 12 | `sku_id` يميّز المتغيّرات، ونفس `id` يتكرر لكل متغيّر | List Product Quantities | https://docs.salla.dev/9612796e0 | 2026-10-22 | `quantity_key = "sku:<sku_id>"` أو `"product:<id>"`؛ اختبار وحدة يؤكد عدم اندماج المتغيّرات |
+| 13 | `price` يصل رقمًا أو نصًا | List Product Quantities | https://docs.salla.dev/9612796e0 | 2026-10-22 | يُطبَّع إلى `numeric(14,2)` نصًا بدقة منزلتين |
+| 14 | `X-RateLimit-*` و`Retry-After` موثّقة | Rate Limiting | https://docs.salla.dev/rate-limiting | 2026-10-22 | نفس آلية Phase 04؛ `Retry-After` يُحترم حرفيًا ولا تُقصَّر المدة |
+| 15 | `mobile_code` يأتي `"+966"` في الطلبات و`"967"` في العملاء، و`country_code` بين `"SA"` و`"sa"` | List Orders + List Customers | https://docs.salla.dev/5394146e0 | 2026-10-22 | يُحفظ النص كما وصل؛ يُطبَّع `country_code` إلى أحرف كبيرة للعرض فقط، والهاتف يُجمَّع للعرض دون تعديل المخزَّن |
+
+---
+
+## 13. قيود وتعارضات Phase 05
+
+### 13.1 بنود الطلب لا يمكن ربطها بمنتج (قيد، لا خطأ)
+
+- **الواقع الموثّق:** `List Orders` يعيد `name`/`quantity`/`thumbnail` لكل سطر. `Order Details` صار `format=light` افتراضيًا ويُسقط `Items`، والاستجابة الموسّعة القديمة أُزيلت (2026-09-01).
+- **القرار:** تُحفظ البنود بما هو موثّق فقط، وبأعمدة `NULL` لما لا وجود له، مع `link_status = 'no_product_reference'`. لا مطابقة بالاسم، ولا إنشاء منتج وهمي، ولا نداء تفاصيل لكل طلب.
+- **الأثر:** التقارير المستقبلية التي تحتاج «منتجًا» في سطر الطلب يجب أن تنتظر مصدرًا موثّقًا (Webhook أو تقرير/تصدير رسمي) — ولا يُخترع الآن.
+- **إعادة التحقق:** عند أي تغيير في صفحة List Orders أو Order Details، يُعاد فحص هذا القيد قبل المرحلة 06.
+
+### 13.2 حقول عميل غير متاحة في القائمة
+
+- `created_at` غير موجود، و`full_name` غير موجود، و`lang`/`currency`/`type`/`country_code`/`birthday` غير موجودة في `List Customers`.
+- **القرار:** الأعمدة nullable، وتُملأ فقط من كائن العميل المرافق للطلب (`enrich`)، و`source_created_at` يبقى `NULL` حتى يصبح متاحًا موثّقًا. الواجهة تعرض «—».
+
+### 13.3 اختلاف شكل الهاتف والدولة
+
+- `mobile` كائن في الطلبات وقد يكون نصًا/رقمًا في مسارات أخرى؛ `mobile_code` بصيغتين (`+966` / `967`)؛ `country_code` بحالتين (`SA` / `sa`).
+- **القرار:** يُخزَّن النص كما وصل (بلا إعادة كتابة)، ويُطبَّع للعرض فقط (ADR-043).
+
+### 13.4 لا نقطة موثّقة لحذف/إلغاء الطلبات أو العملاء
+
+- لا سرد موثوق للمحذوف في أي من النقاط الثلاث.
+- **القرار:** لا حذف تلقائي. `last_seen_at` يُحدَّث، والصف يبقى. (نفس سياسة Phase 04، ADR-038.)

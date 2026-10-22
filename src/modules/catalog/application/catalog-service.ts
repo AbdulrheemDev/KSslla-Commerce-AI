@@ -1,5 +1,4 @@
 import type { Database } from "@/db/client";
-import type { SyncRun } from "@/db/schema";
 import { withTenantTransaction } from "@/db/tenant";
 import { AppError } from "@/lib/errors";
 import { assertPermission } from "@/modules/identity/application/authorization";
@@ -10,9 +9,6 @@ import type {
   PersistedCategory,
   PersistedProduct,
   ProductPage,
-  SyncResource,
-  SyncResourceState,
-  SyncRunSummary,
 } from "@/modules/catalog/domain/types";
 import {
   countCategories,
@@ -24,12 +20,8 @@ import {
   listProducts,
   type ProductListRow,
 } from "@/modules/catalog/infrastructure/product-repository";
-import {
-  findLatestRun,
-  findLatestRunWithStatus,
-  findLatestSuccessfulRun,
-  findRunningLock,
-} from "@/modules/catalog/infrastructure/sync-repository";
+import { findLatestSuccessfulRun } from "@/modules/catalog/infrastructure/sync-repository";
+import { resolveResourceState } from "@/modules/sync/application/sync-state";
 
 /**
  * Read-side catalogue use cases.
@@ -40,65 +32,6 @@ import {
  */
 
 const MAX_PAGE_SIZE = 50;
-
-function toRunSummary(run: SyncRun): SyncRunSummary {
-  return {
-    id: run.id,
-    resource: run.resource as SyncResource,
-    status: run.status as SyncRunSummary["status"],
-    correlationId: run.correlationId,
-    itemsProcessed: run.itemsProcessed,
-    itemsCreated: run.itemsCreated,
-    itemsUpdated: run.itemsUpdated,
-    relationsLinked: run.relationsLinked,
-    itemsSkipped: run.itemsSkipped,
-    pagesProcessed: run.pagesProcessed,
-    errorCode: run.errorCode,
-    startedAt: run.startedAt.toISOString(),
-    finishedAt: run.finishedAt?.toISOString() ?? null,
-  };
-}
-
-async function resolveResourceState(
-  db: Database,
-  context: TenantContext,
-  storeId: string,
-  resource: SyncResource,
-): Promise<SyncResourceState> {
-  return withTenantTransaction(
-    db,
-    { userId: context.userId, organizationId: context.organizationId },
-    async (tx) => {
-      const [latest, success, failure, running] = await Promise.all([
-        findLatestRun(tx, storeId, resource),
-        findLatestRunWithStatus(tx, storeId, resource, "succeeded"),
-        findLatestRunWithStatus(tx, storeId, resource, "failed"),
-        findRunningLock(tx, storeId, resource),
-      ]);
-
-      const status: SyncResourceState["status"] = running
-        ? "running"
-        : !latest
-          ? "never"
-          : latest.status === "running"
-            ? "running"
-            : latest.status === "succeeded"
-              ? "succeeded"
-              : "failed";
-
-      return {
-        resource,
-        status,
-        lastRun: latest ? toRunSummary(latest) : null,
-        lastStartedAt: latest?.startedAt.toISOString() ?? null,
-        lastCompletedAt: latest?.finishedAt?.toISOString() ?? null,
-        lastSuccessAt: success?.finishedAt?.toISOString() ?? null,
-        lastFailureAt: failure?.finishedAt?.toISOString() ?? null,
-        lastErrorCode: latest?.errorCode ?? null,
-      };
-    },
-  );
-}
 
 export async function getCommerceOverview(
   db: Database,
@@ -120,16 +53,26 @@ export async function getCommerceOverview(
     (tx) => findLatestSuccessfulRun(tx, storeId),
   );
 
-  const [productState, categoryState] = await Promise.all([
-    resolveResourceState(db, context, storeId, "products"),
-    resolveResourceState(db, context, storeId, "categories"),
-  ]);
+  const [productState, categoryState, customerState, orderState, inventoryState] =
+    await Promise.all([
+      resolveResourceState(db, context, storeId, "products"),
+      resolveResourceState(db, context, storeId, "categories"),
+      resolveResourceState(db, context, storeId, "customers"),
+      resolveResourceState(db, context, storeId, "orders"),
+      resolveResourceState(db, context, storeId, "inventory"),
+    ]);
 
   return {
     products,
     categories,
     lastSyncedAt: lastSuccessful?.finishedAt?.toISOString() ?? null,
-    sync: { products: productState, categories: categoryState },
+    sync: {
+      products: productState,
+      categories: categoryState,
+      customers: customerState,
+      orders: orderState,
+      inventory: inventoryState,
+    },
   };
 }
 

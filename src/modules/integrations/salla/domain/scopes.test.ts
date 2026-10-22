@@ -9,7 +9,13 @@ import {
 
 describe("Salla scopes", () => {
   it("requests exactly the scopes the implemented features use", () => {
-    expect(SALLA_REQUIRED_SCOPES).toEqual(["offline_access", "products.read", "categories.read"]);
+    expect(SALLA_REQUIRED_SCOPES).toEqual([
+      "offline_access",
+      "products.read",
+      "categories.read",
+      "orders.read",
+      "customers.read",
+    ]);
   });
 
   it("never asks for a write scope", () => {

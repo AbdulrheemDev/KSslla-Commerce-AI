@@ -10,3 +10,5 @@ export * from "@/db/schema/store-connections";
 export * from "@/db/schema/oauth-states";
 export * from "@/db/schema/catalog";
 export * from "@/db/schema/sync";
+export * from "@/db/schema/commerce";
+export * from "@/db/schema/inventory";

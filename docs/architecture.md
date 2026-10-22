@@ -42,28 +42,28 @@ KSHakha Commerce AI هو **AI Commerce Operating System** لمتاجر Salla، �
 
 **الاستنتاج:** المشروع Greenfield. لا يوجد كود قائم يستحق الحفاظ عليه، لذلك بُني حد أدنى من الأساس بدل إعادة بناء نظام غير موجود.
 
-### A.2 الحالة التقنية بعد Phase 04
+### A.2 الحالة التقنية بعد Phase 05
 
 | الطبقة | التقنية / الحالة |
 |---|---|
 | Framework | Next.js **16.4.2** (App Router, Turbopack build) |
 | UI | React **19.3.1**، Tailwind CSS **4.3.3** (CSS-first tokens)، صفحة تأسيسية RTL |
 | Language | TypeScript **5.9.3**، `strict`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax` |
-| Backend | 20 Route Handler: صحة، مصادقة، جلسة، مؤسسة، أعضاء، دعوات، متاجر، تدقيق، Salla OAuth، كتالوج |
-| Database | **PostgreSQL 16+** مع 14 جدولًا و6 هجرات (بنية + RLS + كتالوج) عبر Drizzle |
+| Backend | 24 Route Handler: صحة، مصادقة، جلسة، مؤسسة، أعضاء، دعوات، متاجر، تدقيق، Salla OAuth، كتالوج، وبيانات الطلبات/العملاء/المخزون |
+| Database | **PostgreSQL 16+** مع 18 جدولًا و9 هجرات (بنية + RLS + كتالوج + طلبات/عملاء/مخزون) عبر Drizzle |
 | ORM / Migrations | Drizzle ORM **0.45.4** + drizzle-kit **0.31.11** |
 | Authentication | **منفّذة** — scrypt، جلسات مخزّنة، إبطال فوري، كوكي `__Host-` |
 | Authorization | **منفّذة** — RBAC بخمسة أدوار + RLS كطبقة ثانية |
 | AI | عقد `AiProvider` + `AiGateway` + سجل مزوّدين **فارغ** (بلا مزوّد) |
-| Salla integration | **OAuth + قراءة الكتالوج** — Custom Mode، قراءة فقط، محاكي بروتوكول فقط |
+| Salla integration | **OAuth + قراءة الكتالوج والطلبات والعملاء والمخزون** — Custom Mode، قراءة فقط، محاكي بروتوكول فقط |
 | Queue / Workers | **لا توجد** — Phase 06 |
 | Logging | pino **10.4.0** مع تنقية مسارات حساسة |
 | Validation | Zod **4.6.7** (بيئة + مدخلات AI + مخرجات منظمة) |
-| Testing | Vitest **5.0.5** — 146 وحدة + 88 تكامل/أمن على PostgreSQL حقيقي |
+| Testing | Vitest **5.0.5** — 179 وحدة + 101 تكامل/أمن على PostgreSQL حقيقي |
 | Lint / Format | ESLint **9.39.5** (flat config) + Prettier **3.9.10** |
 | CI | GitHub Actions (lint → typecheck → unit → PostgreSQL integration → secrets → build) |
 | Deployment | **غير مهيأ** — التصميم موثّق فقط |
-| Docs | `architecture`, `product-spec`, `roadmap`, `decisions`, `salla-reference`, `phase-02…04` |
+| Docs | `architecture`, `product-spec`, `roadmap`, `decisions`, `salla-reference`, `phase-02…05` |
 
 ### A.3 ما هو موجود فعليًا في الكود
 
@@ -71,18 +71,20 @@ KSHakha Commerce AI هو **AI Commerce Operating System** لمتاجر Salla، �
 - `src/lib/errors.ts` — تصنيف أخطاء موحّد مع ربط HTTP وحجب التفاصيل العامة.
 - `src/lib/logger.ts` — سجلات JSON مع `redact` للرموز وكلمات المرور.
 - `src/lib/ai/*` — عقد المزوّد، سجل فارغ، وبوابة توليد. **لم يتغيّر في Phase 02.**
-- `src/db/` — اتصال postgres.js، `withTenantTransaction`، الهجرات، و14 جدولًا.
+- `src/db/` — اتصال postgres.js، `withTenantTransaction`، الهجرات، و18 جدولًا.
 - `src/modules/identity` — scrypt، رموز HMAC، مصفوفة صلاحيات، تسجيل/دخول/جلسات.
 - `src/modules/organizations` — المؤسسة، العضويات، الدعوات، وقواعد منع التصعيد.
 - `src/modules/stores` — سجلات داخلية مرتبطة أو غير مرتبطة، مع عزل صريح.
 - `src/modules/catalog` — DTO/Zod، mappers، ترقيم، سياسة إعادة محاولة، مستودعات المنتجات/التصنيفات، وخدمتا القراءة والمزامنة.
+- `src/modules/orders` / `src/modules/customers` / `src/modules/inventory` — DTO/Zod، mappers، مستودعات، وخدمات قراءة ومزامنة لكل مورد.
+- `src/modules/sync` — مشغّل الصفحات المشترك (`paged-sync`)، تطبيع أخطاء المزوّد، حالة المزامنة لخمسة موارد، ومشغّل `StoreDataSyncService`.
 - `src/modules/audit` — سجل تدقيق append-only بلا أسرار.
 - `src/modules/integrations/salla` — نطاق OAuth، عميل البروتوكول، مدير الرموز، خدمة الاتصال، ومستودعات الحالة/الاتصال.
 - `src/lib/crypto.ts` — تشفير AES-256-GCM مع AAD للمستأجر.
 - `src/server/` — CSRF، معدّل الطلبات، سياق المستأجر، طبقة API موحّدة.
-- `src/app/*` — واجهة عربية RTL: دخول، تسجيل، تهيئة، مساحة مؤسسة، أعضاء، متاجر، بطاقة ربط Salla، منتجات وتصنيفات، دعوة.
-- 14 جدولًا (أُضيفت `products`, `categories`, `product_categories`, `sync_runs`, `sync_locks`)، و5 هجرات.
-- 234 اختبارًا: 146 وحدة + 88 تكامل/أمن على PostgreSQL حقيقي (منها 54 لـ Salla: 25 تفويض/اتصال، 7 رموز، 22 كتالوج).
+- `src/app/*` — واجهة عربية RTL: دخول، تسجيل، تهيئة، مساحة مؤسسة، أعضاء، متاجر، بطاقة ربط Salla، منتجات وتصنيفات، طلبات/عملاء/مخزون، دعوة.
+- 18 جدولًا (أُضيفت `products`, `categories`, `product_categories`, `sync_runs`, `sync_locks` في Phase 04، و`customers`, `orders`, `order_items`, `inventory_levels` في Phase 05)، و9 هجرات.
+- 280 اختبارًا: 179 وحدة + 101 تكامل/أمن على PostgreSQL حقيقي (منها 67 لـ Salla: 25 تفويض/اتصال، 7 رموز، 22 كتالوج، 13 لبيانات الطلبات/العملاء/المخزون).
 
 ### A.2.1 مسار ربط Salla (Phase 03)
 

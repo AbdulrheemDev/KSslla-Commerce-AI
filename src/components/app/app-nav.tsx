@@ -27,6 +27,9 @@ export function AppNav({
     { href: "/app", label: "نظرة عامة" },
     ...(permissions.includes("member:read") ? [{ href: "/app/members", label: "الأعضاء" }] : []),
     { href: "/app/stores", label: "المتاجر" },
+    { href: "/app/orders", label: "الطلبات" },
+    { href: "/app/customers", label: "العملاء" },
+    { href: "/app/inventory", label: "المخزون" },
   ];
 
   return (

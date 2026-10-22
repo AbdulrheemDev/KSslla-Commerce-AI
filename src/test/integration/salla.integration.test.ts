@@ -95,7 +95,9 @@ describe("Salla OAuth start", () => {
     expect(url.searchParams.get("redirect_uri")).toBe(
       "http://localhost:3000/api/integrations/salla/callback",
     );
-    expect(url.searchParams.get("scope")).toBe("offline_access products.read categories.read");
+    expect(url.searchParams.get("scope")).toBe(
+      "offline_access products.read categories.read orders.read customers.read",
+    );
     expect(url.searchParams.get("state")).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(response.body.data!.authorizationUrl).not.toContain("test-client-secret-value");
 
@@ -212,7 +214,13 @@ describe("Salla OAuth callback", () => {
     expect(connection?.status).toBe("connected");
     expect(connection?.externalStoreId).toBe("847769313");
     expect(connection?.externalUserId).toBe("1689171978");
-    expect(connection?.scopes).toEqual(["offline_access", "products.read", "categories.read"]);
+    expect(connection?.scopes).toEqual([
+      "offline_access",
+      "products.read",
+      "categories.read",
+      "orders.read",
+      "customers.read",
+    ]);
     expect(connection?.connectedAt).not.toBeNull();
 
     // Ciphertext must not contain the token, and must decrypt with the tenant AAD.

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { Database } from "@/db/client";
 import type { StoreConnection } from "@/db/schema";
 import { withTenantTransaction } from "@/db/tenant";
-import { AppError, isAppError, toAppError } from "@/lib/errors";
+import { AppError, toAppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { metrics } from "@/lib/metrics";
 import { recordAudit } from "@/modules/audit/infrastructure/audit-repository";
@@ -18,7 +18,6 @@ import {
   fitsRetryBudget,
   retryDelayMs,
   shouldRetry,
-  type FailureKind,
 } from "@/modules/catalog/domain/retry";
 import { mapCategory, mapProduct } from "@/modules/catalog/domain/mappers";
 import type {
@@ -40,7 +39,6 @@ import { assertPermission } from "@/modules/identity/application/authorization";
 import type { RequestMeta, TenantContext } from "@/modules/identity/application/types";
 import { getAccessToken } from "@/modules/integrations/salla/application/token-manager";
 import {
-  isSallaError,
   sallaInvalidGrant,
   sallaInvalidResponse,
 } from "@/modules/integrations/salla/domain/errors";
@@ -54,6 +52,10 @@ import {
   markReauthRequired,
 } from "@/modules/integrations/salla/infrastructure/connection-repository";
 import { requireStoreAccess } from "@/modules/stores/application/store-service";
+import {
+  classifyProviderFailure as classify,
+  providerFailureCode as failureCode,
+} from "@/modules/sync/domain/failures";
 
 /**
  * Catalogue sync use case.
@@ -116,61 +118,6 @@ export interface SyncOutcome {
 
 export interface SyncResult {
   runs: SyncOutcome[];
-}
-
-function failureCode(error: unknown): string {
-  if (!isSallaError(error)) {
-    return isAppError(error) ? error.code.toLowerCase() : "internal_error";
-  }
-
-  switch (error.sallaKind) {
-    case "network":
-      return "network_error";
-    case "rate_limited":
-      return "rate_limited";
-    case "invalid_response":
-      return "invalid_response";
-    case "invalid_grant":
-      return "reauth_required";
-    case "not_configured":
-      return "not_configured";
-    case "api": {
-      const status = Number(error.details?.providerStatus ?? 0);
-      if (status === 401) return "unauthorized";
-      if (status === 403) return "forbidden";
-      if (status === 404) return "not_found";
-      return status >= 500 ? "provider_error" : "provider_rejected";
-    }
-    default:
-      return "salla_error";
-  }
-}
-
-function classify(error: unknown): { kind: FailureKind; retryAfterSeconds?: number } | null {
-  if (!isSallaError(error)) return null;
-
-  switch (error.sallaKind) {
-    case "network":
-      return { kind: "network" };
-    case "rate_limited":
-      return {
-        kind: "rate_limited",
-        retryAfterSeconds:
-          typeof error.details?.retryAfterSeconds === "number"
-            ? error.details.retryAfterSeconds
-            : undefined,
-      };
-    case "invalid_response":
-      return { kind: "schema" };
-    case "api": {
-      const status = Number(error.details?.providerStatus ?? 0);
-      if (status === 401) return { kind: "auth" };
-      if (status >= 500) return { kind: "server" };
-      return { kind: "client" };
-    }
-    default:
-      return null;
-  }
 }
 
 function missingScopes(connection: StoreConnection): string[] {

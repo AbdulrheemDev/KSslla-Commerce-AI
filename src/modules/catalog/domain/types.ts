@@ -6,7 +6,13 @@
  * not on the provider payload.
  */
 
-export const SYNC_RESOURCES = ["categories", "products"] as const;
+export const SYNC_RESOURCES = [
+  "products",
+  "categories",
+  "customers",
+  "orders",
+  "inventory",
+] as const;
 export type SyncResource = (typeof SYNC_RESOURCES)[number];
 
 export const SYNC_RUN_STATUSES = ["running", "succeeded", "failed"] as const;

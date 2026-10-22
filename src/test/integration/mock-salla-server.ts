@@ -44,6 +44,54 @@ export interface MockCategory {
   update_at?: string;
 }
 
+export interface MockOrder {
+  id: number | string;
+  external_reference_id?: string | number | null;
+  reference_id?: string | number | null;
+  total?: { amount: number | string; currency: string };
+  date?: { date: string; timezone_type: number; timezone: string };
+  source?: string;
+  status?: { id: number | string; name: string; slug: string };
+  draft?: boolean;
+  payment_method?: string;
+  is_pending_payment?: boolean;
+  items?: Array<{ name: string; quantity: number | string; thumbnail: string | null }>;
+  customer?: MockCustomer;
+}
+
+export interface MockCustomer {
+  id: number | string;
+  first_name?: string | null;
+  last_name?: string | null;
+  mobile?: { number: number | string; mobile_code?: string } | string | number | null;
+  mobile_code?: string | null;
+  email?: string | null;
+  gender?: string | null;
+  birthday?: { date: string; timezone_type?: number; timezone?: string } | null;
+  city?: string | null;
+  country?: string | null;
+  country_code?: string | null;
+  currency?: string | null;
+  lang?: string | null;
+  type?: string | null;
+  created_at?: { date: string } | string | null;
+  updated_at?: { date: string } | string;
+  groups?: unknown[];
+}
+
+export interface MockQuantity {
+  id: number | string;
+  name: string;
+  image?: string | null;
+  sku_id?: number | string | null;
+  sku?: string | null;
+  quantity: number | string;
+  sold_quantity: number | string;
+  price: number | string;
+  unlimited_quantity: boolean;
+  variant?: string | null;
+}
+
 export interface MockSallaBehaviour {
   /** Reject the next authorization_code exchange with this error code. */
   authorizationCodeError?: string | null;
@@ -69,6 +117,20 @@ export interface MockSallaBehaviour {
   rejectRefresh?: boolean;
   /** Fail catalogue requests from this 1-based request number onward. */
   catalogFailFrom?: number | null;
+  /** HTTP status returned for orders/customers/quantities, if set. */
+  dataStatus?: number | null;
+  /** Number of data requests that fail with `dataFailureStatus` before succeeding. */
+  dataFailuresRemaining?: number;
+  /** Status used for the first `dataFailuresRemaining` requests (default 500). */
+  dataFailureStatus?: number | null;
+  /** Value of the Retry-After header sent with a failing data request. */
+  dataRetryAfter?: number | null;
+  /** Return a body that does not match the documented envelope. */
+  dataMalformed?: boolean;
+  /** Return page 1 data for every requested orders page. */
+  ordersRepeatPage?: boolean;
+  /** Disable the documented sequential-read guard (for negative tests only). */
+  ordersAllowOutOfOrder?: boolean;
 }
 
 export interface RecordedRequest {
@@ -92,15 +154,26 @@ export class MockSallaServer {
   readonly validAccessTokens = new Set<string>();
 
   private catalogRequestSeq = 0;
+  private dataRequestSeq = 0;
 
   products: MockProduct[] = [];
   categories: MockCategory[] = [];
   productPageSize = 30;
 
+  orders: MockOrder[] = [];
+  customers: MockCustomer[] = [];
+  quantities: MockQuantity[] = [];
+  /** Documented default page sizes: 15 for customers/quantities, 30 for orders. */
+  orderPageSize = 30;
+  customerPageSize = 30;
+  quantityPageSize = 30;
+  /** The last orders page served, so an out-of-sequence read can return empty. */
+  lastOrdersPage = 0;
+
   merchantId = "847769313";
   userId = "1689171978";
   merchantName = "متجر تجريبي";
-  scope = "offline_access products.read categories.read";
+  scope = "offline_access products.read categories.read orders.read customers.read";
 
   get url(): string {
     return this.baseUrl;
@@ -165,6 +238,15 @@ export class MockSallaServer {
           return;
         }
 
+        if (
+          path === "/admin/v2/orders" ||
+          path === "/admin/v2/customers" ||
+          path === "/admin/v2/products/quantities"
+        ) {
+          this.handleDataList(req, query, path, send);
+          return;
+        }
+
         if (path === "/admin/v2/products" || path === "/admin/v2/categories") {
           const answer = () => this.handleCatalog(req, query, path.endsWith("products"), send);
           if (this.behaviour.catalogDelayMs && this.behaviour.catalogDelayMs > 0) {
@@ -211,6 +293,18 @@ export class MockSallaServer {
     this.behaviour.rejectRefresh = false;
     this.behaviour.catalogFailFrom = null;
     this.catalogRequestSeq = 0;
+    this.behaviour.dataStatus = null;
+    this.behaviour.dataFailuresRemaining = 0;
+    this.behaviour.dataFailureStatus = null;
+    this.behaviour.dataRetryAfter = null;
+    this.behaviour.dataMalformed = false;
+    this.behaviour.ordersRepeatPage = false;
+    this.behaviour.ordersAllowOutOfOrder = false;
+    this.dataRequestSeq = 0;
+    this.lastOrdersPage = 0;
+    this.orders = [];
+    this.customers = [];
+    this.quantities = [];
     this.merchantId = "847769313";
     this.userId = "1689171978";
     this.merchantName = "متجر تجريبي";
@@ -227,6 +321,105 @@ export class MockSallaServer {
     const token = header.replace(/^Bearer\s+/i, "");
     if (!token || !this.validAccessTokens.has(token)) return null;
     return token;
+  }
+
+  /**
+   * Documented list behaviour for orders/customers/quantities.
+   *
+   * Orders are **sequential only**: asking for a page other than the next one
+   * returns an empty `data` array with the real pagination block, exactly as
+   * the docs describe. Customers and quantities have no such rule.
+   */
+  private handleDataList(
+    req: { headers: { authorization?: string } },
+    query: Record<string, string>,
+    path: string,
+    send: (status: number, body: unknown, headers?: Record<string, string>) => void,
+  ): void {
+    if (!this.accessTokenFrom(req)) {
+      send(401, {
+        status: 401,
+        success: false,
+        error: { code: "Unauthorized", message: "The access token is invalid" },
+      });
+      return;
+    }
+
+    this.dataRequestSeq += 1;
+
+    const fail = (status: number) => {
+      const headers: Record<string, string> =
+        this.behaviour.dataRetryAfter !== null && this.behaviour.dataRetryAfter !== undefined
+          ? { "retry-after": String(this.behaviour.dataRetryAfter) }
+          : {};
+      send(
+        status,
+        { status, success: false, error: { code: "error", message: "forced" } },
+        headers,
+      );
+    };
+
+    if (this.behaviour.dataFailuresRemaining && this.behaviour.dataFailuresRemaining > 0) {
+      this.behaviour.dataFailuresRemaining -= 1;
+      fail(this.behaviour.dataFailureStatus ?? this.behaviour.dataStatus ?? 500);
+      return;
+    }
+
+    if (this.behaviour.dataStatus) {
+      fail(this.behaviour.dataStatus);
+      return;
+    }
+
+    if (this.behaviour.dataMalformed) {
+      send(200, { status: 200, success: true, data: "not-an-array" });
+      return;
+    }
+
+    const isOrders = path === "/admin/v2/orders";
+    const isCustomers = path === "/admin/v2/customers";
+    const source: unknown[] = isOrders
+      ? this.orders
+      : isCustomers
+        ? this.customers
+        : this.quantities;
+    const defaultSize = isOrders
+      ? this.orderPageSize
+      : isCustomers
+        ? this.customerPageSize
+        : this.quantityPageSize;
+
+    const page = Math.max(1, Number(query.page ?? "1") || 1);
+    const perPage = Math.min(60, Math.max(1, Number(query.per_page ?? defaultSize) || defaultSize));
+    const totalPages = Math.max(1, Math.ceil(source.length / perPage));
+
+    const envelope = (data: unknown[], currentPage: number) => ({
+      status: 200,
+      success: true,
+      data,
+      pagination: {
+        count: data.length,
+        total: source.length,
+        perPage,
+        currentPage,
+        totalPages,
+        links: { next: null, previous: null },
+      },
+    });
+
+    if (isOrders && !this.behaviour.ordersAllowOutOfOrder) {
+      // Page 1 starts a new pagination pass (the documented 15-minute window);
+      // anything after it must be the immediate next page.
+      if (page !== 1 && page !== this.lastOrdersPage + 1) {
+        // Documented: an out-of-sequence request returns an empty response.
+        send(200, envelope([], page));
+        return;
+      }
+      this.lastOrdersPage = page;
+    }
+
+    const effectivePage = isOrders && this.behaviour.ordersRepeatPage ? 1 : page;
+    const slice = source.slice((effectivePage - 1) * perPage, effectivePage * perPage);
+    send(200, envelope(slice, page));
   }
 
   private handleCatalog(

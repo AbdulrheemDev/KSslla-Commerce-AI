@@ -43,6 +43,27 @@
       "when": 1792627023433,
       "tag": "0005_catalog_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792679144699,
+      "tag": "0006_phase05_orders_customers_inventory",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792683000000,
+      "tag": "0007_commerce_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792690000000,
+      "tag": "0008_orders_raw_payload",
+      "breakpoints": true
     }
   ]
 }

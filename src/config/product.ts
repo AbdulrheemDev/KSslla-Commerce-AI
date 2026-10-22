@@ -17,10 +17,10 @@ export const PRODUCT = {
   version: "0.1.0",
   designPartnerAr: "متجر كشخة",
   phase: {
-    number: 4,
-    label: "04",
-    titleAr: "مزامنة المنتجات والتصنيفات",
-    titleEn: "Products + Categories Sync",
+    number: 5,
+    label: "05",
+    titleAr: "الطلبات والعملاء وأساس المخزون",
+    titleEn: "Orders + Customers + Inventory Foundation",
   },
 } as const;
 
@@ -267,4 +267,5 @@ export const DOCUMENTS: readonly { file: string; labelAr: string }[] = [
   { file: "docs/phase-02.md", labelAr: "تنفيذ Phase 02" },
   { file: "docs/phase-03.md", labelAr: "تنفيذ Phase 03" },
   { file: "docs/phase-04.md", labelAr: "تنفيذ Phase 04" },
+  { file: "docs/phase-05.md", labelAr: "تنفيذ Phase 05" },
 ] as const;
