@@ -275,6 +275,34 @@ async function loadHandler(
     return { dispatch };
   }
 
+  const webhookReplay = normalized.match(
+    /^\/api\/organizations\/current\/stores\/([^/]+)\/webhooks\/([^/]+)\/replay$/,
+  );
+  if (webhookReplay) {
+    const handlers =
+      (await import("@/app/api/organizations/current/stores/[storeId]/webhooks/[eventId]/replay/route")) as Record<
+        string,
+        unknown
+      >;
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
+  const webhookList = normalized.match(
+    /^\/api\/organizations\/current\/stores\/([^/]+)\/webhooks$/,
+  );
+  if (webhookList) {
+    const handlers =
+      (await import("@/app/api/organizations/current/stores/[storeId]/webhooks/route")) as Record<
+        string,
+        unknown
+      >;
+    const dispatch = handlers[method] as Handler | undefined;
+    if (!dispatch) throw new Error(`No ${method} handler for ${normalized}`);
+    return { dispatch };
+  }
+
   if (normalized === "/api/integrations/salla/callback") {
     const handlers = (await import("@/app/api/integrations/salla/callback/route")) as Record<
       string,
