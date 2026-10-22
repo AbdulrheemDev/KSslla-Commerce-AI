@@ -1,0 +1,10 @@
+.next
+node_modules
+coverage
+package-lock.json
+next-env.d.ts
+docs/**
+*.md
+.tmp
+.pgdata-test
+.pgdata-dev
