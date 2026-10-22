@@ -137,19 +137,18 @@ export async function ingestSallaWebhook(db: Database, input: IngestInput): Prom
       });
     });
 
-    await recordAudit(db, {
-      organizationId: null,
-      actorUserId: null,
-      action: "webhook.unmatched",
-      entityType: "webhook_event",
-      entityId: inserted.id,
-      metadata: {
-        provider: "salla",
-        eventName,
-        externalStoreId,
-        duplicate: inserted.duplicate,
-      },
-    });
+    // A duplicate is not a new delivery: the audit trail records one row per
+    // body, exactly like the inbox does.
+    if (!inserted.duplicate) {
+      await recordAudit(db, {
+        organizationId: null,
+        actorUserId: null,
+        action: "webhook.unmatched",
+        entityType: "webhook_event",
+        entityId: inserted.id,
+        metadata: { provider: "salla", eventName, externalStoreId },
+      });
+    }
 
     logger.warn(
       {
