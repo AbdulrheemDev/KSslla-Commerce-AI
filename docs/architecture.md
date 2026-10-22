@@ -395,7 +395,7 @@ Salla API / Webhooks
 - بريد + كلمة مرور، مع تحقق بريد قبل تفعيل الوصول للمتجر.
 - `scrypt` (Node built-in) مع salt عشوائي لكل مستخدم ومعاملات موثّقة. Argon2id خيار بعد إثبات بيئة النشر.
 - جلسة **opaque** 256-bit، تُخزَّن **مُجزّأة SHA-256** في `sessions`.
-- الكوكي: `__Host-ksh_session`، `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`.
+- الكوكي: `__Host-ksh_session`، `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/` (نمط معاينة التطوير المدمجة فقط: `SameSite=None; Partitioned` — ADR-055).
 - انتهاء خمول 7 أيام، وحد أقصى 30 يومًا، وتدوير عند تغيير كلمة المرور/الصلاحيات.
 - تسجيل الخروج لكل الأجهزة، وإبطال فوري من قاعدة البيانات.
 - Rate limiting على تسجيل الدخول (IP + الحساب)، وتأخير تدريجي.
@@ -466,7 +466,7 @@ Internal Store UUID  ← يُستخدم في كل استعلام
 - Rate limit متعدد المستويات: IP، مستخدم، مؤسسة، متجر.
 - كتابة idempotent عبر `Idempotency-Key` عند الحاجة.
 - Same-origin فقط؛ لا CORS مفتوح.
-- فحص `Origin` على طلبات cookie-state-changing، مع `SameSite=Lax`.
+- فحص `Origin` على طلبات cookie-state-changing، مع `SameSite=Lax` (`Partitioned; SameSite=None` في معاينة التطوير المدمجة فقط — ADR-055).
 - رؤوس أمان مفعّلة في `next.config.ts`؛ **CSP مؤجلة إلى Phase 24** لأنها تحتاج nonce middleware.
 - لا تُعاد تفاصيل داخلية في الأخطاء العامة (`toPublicError`).
 
